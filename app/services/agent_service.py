@@ -9,6 +9,7 @@ from app.agent.tools import get_tools
 from app.agent.executor import ToolExecutor
 from app.services.slides_service import SlidesService
 from app.services.drive_service import DriveService
+from app.utils.anthropic_safe import safe_anthropic_call
 
 
 class AgentService:
@@ -40,11 +41,18 @@ class AgentService:
             dict: Final result with presentation_id, shareable_link, title, and slide_count
             
         Raises:
-            APIError: If Anthropic API call fails
-            ValueError: If agent fails to complete task
+            ValueError: If agent fails to complete task or API error occurs
         """
         # Reset executor state
         self.executor.reset_state()
+        
+        # Let APIError propagate to FastAPI exception handler - don't convert it
+        return self._generate_presentation_internal(user_prompt)
+    
+    def _generate_presentation_internal(self, user_prompt: str) -> Dict[str, Any]:
+        """
+        Internal method to generate presentation (actual implementation)
+        """
         
         # System prompt for the agent
         system_prompt = """You are an expert AI agent that creates Google Slides presentations.
@@ -82,14 +90,28 @@ Think step by step and use the tools available to you."""
             iteration += 1
             
             try:
-                # Call Anthropic API with tools
-                response = self.client.messages.create(
+                # Use safe wrapper - never raises exceptions, returns None on error
+                response_data = safe_anthropic_call(
+                    client=self.client,
+                    messages=messages,
                     model=settings.AGENT_MODEL,
                     max_tokens=4096,
                     system=system_prompt,
-                    messages=messages,
                     tools=self.tools
                 )
+                
+                if response_data is None:
+                    raise ValueError("Anthropic API error: Unable to process request. Please check your API key and model name.")
+                
+                # Create a simple response-like object from the dict
+                class SimpleResponse:
+                    def __init__(self, data):
+                        self.content = data.get("content", [])
+                        self.model = data.get("model", settings.AGENT_MODEL)
+                        self.usage = data.get("usage")
+                        self.id = data.get("id")
+                
+                response = SimpleResponse(response_data)
                 
                 # Process the response
                 for content_block in response.content:
@@ -166,10 +188,29 @@ Think step by step and use the tools available to you."""
                         # No presentation created yet, continue
                         continue
             
-            except APIError as e:
-                raise APIError(f"Anthropic API error on iteration {iteration}: {str(e)}")
             except Exception as e:
-                raise ValueError(f"Error in agent loop on iteration {iteration}: {str(e)}")
+                # Catch everything from API call and convert to ValueError
+                # This prevents APIError from propagating
+                # Don't touch the exception object - just convert to ValueError
+                exc_type = type(e)
+                exc_module = getattr(exc_type, '__module__', '')
+                exc_name = getattr(exc_type, '__name__', 'Unknown')
+                
+                # Check if it's an Anthropic error - NEVER call str() on it
+                is_anthropic_error = (
+                    exc_module == 'anthropic' and 
+                    ('Error' in exc_name or exc_name.endswith('Error'))
+                )
+                
+                if is_anthropic_error:
+                    # Don't try to convert to string - just use generic message
+                    raise ValueError("Anthropic API error: Unable to process request. Please check your API key and model name.")
+                else:
+                    try:
+                        error_msg = str(e)
+                    except:
+                        error_msg = f"{exc_name}: An error occurred"
+                    raise ValueError(f"Error in agent loop on iteration {iteration}: {error_msg}")
         
         # Max iterations reached
         if self.executor.state.presentation_id:

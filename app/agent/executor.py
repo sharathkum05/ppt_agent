@@ -4,6 +4,7 @@ from googleapiclient.errors import HttpError
 
 from app.services.slides_service import SlidesService
 from app.services.drive_service import DriveService
+from app.config import settings
 
 
 class AgentState:
@@ -75,27 +76,49 @@ class ToolExecutor:
                     'success': False
                 }
         except Exception as e:
+            # Safely convert exception to string, avoiding APIError issues
+            from anthropic import APIError
+            
+            # Check if it's an Anthropic error by module/class name (not isinstance)
+            exc_type = type(e)
+            exc_module = getattr(exc_type, '__module__', '')
+            exc_name = getattr(exc_type, '__name__', 'Unknown')
+            
+            is_anthropic_error = (
+                exc_module == 'anthropic' and 
+                ('Error' in exc_name or exc_name.endswith('Error'))
+            )
+            
+            if is_anthropic_error:
+                error_msg = "Anthropic API error occurred"
+            else:
+                try:
+                    error_msg = str(e)
+                except:
+                    error_msg = f"{exc_name}: An error occurred"
             return {
-                'error': str(e),
+                'error': error_msg,
                 'success': False
             }
     
     def _create_presentation(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute create_presentation tool"""
+        """Execute create_presentation tool - uses existing template and clears it"""
         if not self.state.presentation_id:
             title = tool_input.get('title', 'Untitled Presentation')
+            # This will use the hardcoded presentation ID and clear existing slides
             presentation_id = self.slides_service.create_presentation(title)
+            
             self.state.presentation_id = presentation_id
             self.state.presentation_title = title
             return {
                 'success': True,
-                'message': f'Presentation "{title}" created successfully',
+                'message': f'Presentation template ready. All existing slides cleared. Ready to add new slides for "{title}"',
                 'presentation_id': presentation_id
             }
         else:
             return {
                 'success': False,
-                'error': f'Presentation already created. Current presentation: {self.state.presentation_title}',
+                'error': f'Presentation already initialized. Current presentation: {self.state.presentation_title}',
                 'presentation_id': self.state.presentation_id
             }
     
@@ -145,9 +168,14 @@ class ToolExecutor:
                 'state': self.state.to_dict()
             }
         except HttpError as e:
+            # Safely convert HttpError to string
+            try:
+                error_msg = str(e)
+            except:
+                error_msg = f"HttpError: {type(e).__name__}"
             return {
                 'success': False,
-                'error': f'Failed to review presentation: {str(e)}'
+                'error': f'Failed to review presentation: {error_msg}'
             }
     
     def _refine_slide(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
@@ -184,9 +212,18 @@ class ToolExecutor:
             
             return result
         except Exception as e:
+            # Safely convert exception to string, avoiding APIError issues
+            from anthropic import APIError
+            if isinstance(e, APIError):
+                error_msg = "Anthropic API error occurred"
+            else:
+                try:
+                    error_msg = str(e)
+                except:
+                    error_msg = f"{type(e).__name__}: An error occurred"
             return {
                 'success': False,
-                'error': f'Failed to refine slide: {str(e)}'
+                'error': f'Failed to refine slide: {error_msg}'
             }
     
     def _finalize_presentation(self, tool_input: Dict[str, Any]) -> Dict[str, Any]:
@@ -208,9 +245,14 @@ class ToolExecutor:
                 'total_slides': self.state.slides_created
             }
         except HttpError as e:
+            # Safely convert HttpError to string
+            try:
+                error_msg = str(e)
+            except:
+                error_msg = f"HttpError: {type(e).__name__}"
             return {
                 'success': False,
-                'error': f'Failed to finalize presentation: {str(e)}'
+                'error': f'Failed to finalize presentation: {error_msg}'
             }
     
     def reset_state(self):

@@ -7,13 +7,13 @@ from typing import List, Dict, Any
 TOOLS: List[Dict[str, Any]] = [
     {
         "name": "create_presentation",
-        "description": "Creates a new Google Slides presentation. Call this first to initialize a presentation before adding slides.",
+        "description": "Initializes the presentation template by clearing all existing slides. Call this first before adding new slides. Uses a pre-configured presentation template.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "title": {
                     "type": "string",
-                    "description": "The title of the presentation"
+                    "description": "The title/theme of the presentation (for reference, used to guide slide creation)"
                 }
             },
             "required": ["title"]

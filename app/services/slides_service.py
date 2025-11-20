@@ -1,8 +1,9 @@
 """Google Slides API service for creating presentations"""
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from googleapiclient.errors import HttpError
 
 from app.models.schemas import PresentationStructure, SlideContent
+from app.config import settings
 
 
 class SlidesService:
@@ -17,30 +18,71 @@ class SlidesService:
         """
         self.service = slides_service
     
-    def create_presentation(self, title: str) -> str:
+    def clear_all_slides(self, presentation_id: str) -> None:
         """
-        Create a new Google Slides presentation
+        Clear all slides from an existing presentation
         
         Args:
-            title: Title of the presentation
-            
-        Returns:
-            str: Presentation ID
+            presentation_id: ID of the presentation
             
         Raises:
             HttpError: If Google API call fails
         """
         try:
-            presentation = self.service.presentations().create(
-                body={'title': title}
+            # Get the presentation to find all slide IDs
+            presentation = self.service.presentations().get(
+                presentationId=presentation_id
             ).execute()
             
-            return presentation.get('presentationId')
+            slides = presentation.get('slides', [])
+            if not slides:
+                return  # No slides to delete
+            
+            # Build delete requests for all slides (delete all, we'll add new ones)
+            requests = []
+            # Delete slides in reverse order to maintain indices
+            for slide in reversed(slides):
+                requests.append({
+                    'deleteObject': {
+                        'objectId': slide.get('objectId')
+                    }
+                })
+            
+            # Execute delete requests
+            if requests:
+                body = {'requests': requests}
+                self.service.presentations().batchUpdate(
+                    presentationId=presentation_id,
+                    body=body
+                ).execute()
+                    
         except HttpError as error:
-            raise HttpError(
-                f"Failed to create presentation: {error.resp.status} - {error.content}",
-                error.resp
-            )
+            raise error
+    
+    def create_presentation(self, title: str) -> str:
+        """
+        Use existing presentation template and clear it for new content
+        
+        Args:
+            title: Title for the presentation (used for reference, not to rename)
+            
+        Returns:
+            str: Presentation ID of the existing template
+            
+        Raises:
+            HttpError: If Google API call fails
+        """
+        from app.config import settings
+        
+        try:
+            presentation_id = settings.DEFAULT_PRESENTATION_ID
+            
+            # Clear all existing slides
+            self.clear_all_slides(presentation_id)
+            
+            return presentation_id
+        except HttpError as error:
+            raise error
     
     def add_slides_with_content(self, presentation_id: str, presentation_structure: PresentationStructure) -> int:
         """
@@ -199,9 +241,17 @@ class SlidesService:
         Raises:
             HttpError: If Google API call fails
         """
+        import re
+        import time
+        
+        # Generate valid object IDs (must start with word char, only [a-zA-Z0-9_-:])
+        # Use timestamp and sanitize title
+        timestamp = int(time.time() * 1000) % 1000000  # Use last 6 digits of timestamp
+        safe_title = re.sub(r'[^a-zA-Z0-9_-]', '_', title[:10])  # Replace invalid chars with underscore
+        slide_title_id = f'slide_title_{layout}_{timestamp}_{safe_title}'
+        slide_body_id = f'slide_body_{layout}_{timestamp}_{safe_title}'
+        
         requests = []
-        slide_title_id = f'slide_title_{layout}_{title[:10]}'
-        slide_body_id = f'slide_body_{layout}_{title[:10]}'
         
         # Create slide based on layout
         placeholder_mappings = []
@@ -289,10 +339,8 @@ class SlidesService:
                 'title': title
             }
         except HttpError as error:
-            raise HttpError(
-                f"Failed to add slide: {error.resp.status} - {error.content}",
-                error.resp
-            )
+            # Re-raise the original error properly
+            raise error
     
     def get_presentation_info(self, presentation_id: str) -> Dict[str, Any]:
         """

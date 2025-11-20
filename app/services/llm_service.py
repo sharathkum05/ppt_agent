@@ -6,6 +6,7 @@ from anthropic import AnthropicError, APIError
 
 from app.config import settings
 from app.models.schemas import PresentationStructure
+from app.utils.anthropic_safe import safe_anthropic_call
 
 
 class LLMService:
@@ -58,17 +59,41 @@ Guidelines:
 Please provide the response as valid JSON only, without any markdown formatting or code blocks."""
 
         try:
-            message = self.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+            # Use safe wrapper - never raises exceptions, returns None on error
+            response_data = safe_anthropic_call(
+                client=self.client,
+                messages=[{"role": "user", "content": user_message}],
+                model="claude-3-haiku-20240307",  # Use working model
                 max_tokens=4096,
-                system=system_prompt,
-                messages=[
-                    {"role": "user", "content": user_message}
-                ]
+                system=system_prompt
             )
             
+            if response_data is None:
+                raise ValueError("Anthropic API error: Unable to process request. Please check your API key.")
+            
+            # Extract content from response_data
+            content_blocks = response_data.get("content", [])
+            if not content_blocks:
+                raise ValueError("Anthropic API returned empty response")
+            
+            # Create a simple message-like object
+            class SimpleMessage:
+                def __init__(self, content_blocks):
+                    self.content = [type('ContentBlock', (), {'text': block.get('text', '')})() 
+                                   if isinstance(block, dict) else block 
+                                   for block in content_blocks]
+            
+            message = SimpleMessage(content_blocks)
+            
             # Extract text content from response
-            content = message.content[0].text if message.content else ""
+            # Handle both dict and object responses
+            if isinstance(message.content, list) and len(message.content) > 0:
+                if isinstance(message.content[0], dict):
+                    content = message.content[0].get('text', '')
+                else:
+                    content = getattr(message.content[0], 'text', '')
+            else:
+                content = ""
             
             # Clean the response (remove markdown code blocks if present)
             content = content.strip()
@@ -89,8 +114,27 @@ Please provide the response as valid JSON only, without any markdown formatting 
             except json.JSONDecodeError as e:
                 raise ValueError(f"Failed to parse LLM response as JSON: {str(e)}\nResponse: {content[:200]}")
         
-        except APIError as e:
-            raise APIError(f"Anthropic API error: {str(e)}")
         except Exception as e:
-            raise ValueError(f"Unexpected error generating presentation content: {str(e)}")
+            # Catch everything from API call and convert to ValueError
+            # This prevents APIError from propagating
+            # Don't touch the exception object - just convert to ValueError
+            exc_type = type(e)
+            exc_module = getattr(exc_type, '__module__', '')
+            exc_name = getattr(exc_type, '__name__', 'Unknown')
+            
+            # Check if it's an Anthropic error - NEVER call str() on it
+            is_anthropic_error = (
+                exc_module == 'anthropic' and 
+                ('Error' in exc_name or exc_name.endswith('Error'))
+            )
+            
+            if is_anthropic_error:
+                # Don't try to convert to string - just use generic message
+                raise ValueError("Anthropic API error: Unable to process request. Please check your API key.")
+            else:
+                try:
+                    error_msg = str(e)
+                except:
+                    error_msg = f"{exc_name}: An error occurred"
+                raise ValueError(f"Unexpected error generating presentation content: {error_msg}")
 
