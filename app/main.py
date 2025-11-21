@@ -176,19 +176,6 @@ async def startup_event():
         print("Services will be initialized on first request")
 
 
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {
-        "message": "AI Google Slides Generator API - Agent-based",
-        "version": "2.0.0",
-        "architecture": "AI Agent with tool calling",
-        "endpoints": {
-            "generate_presentation": "/generate-presentation (POST)"
-        }
-    }
-
-
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
@@ -261,4 +248,66 @@ async def generate_presentation(request: PresentationRequest):
 
 # REMOVED ALL @app.exception_handler decorators
 # The SafeExceptionMiddleware handles all exceptions before they reach FastAPI's handlers
+
+# Vercel serverless handler
+try:
+    from mangum import Mangum
+    handler = Mangum(app, lifespan="off")  # Disable lifespan for serverless
+except ImportError:
+    handler = None
+    # Mangum not installed, will work for local development
+
+# Serve React frontend (after building with: cd ppt-agent-frontend && npm run build)
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
+
+# Check if frontend build exists
+FRONTEND_BUILD_PATH = os.path.join(os.path.dirname(__file__), "..", "ppt-agent-frontend", "dist")
+FRONTEND_INDEX_PATH = os.path.join(FRONTEND_BUILD_PATH, "index.html")
+
+if os.path.exists(FRONTEND_BUILD_PATH):
+    # Serve static assets (must be before catch-all route)
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_BUILD_PATH, "assets")), name="assets")
+    
+    # Serve frontend for root route (must be AFTER all API routes are defined)
+    @app.get("/", include_in_schema=False)
+    async def serve_frontend():
+        if os.path.exists(FRONTEND_INDEX_PATH):
+            return FileResponse(FRONTEND_INDEX_PATH)
+        return {"message": "Frontend not built. Run: cd ppt-agent-frontend && npm run build"}
+    
+    # Catch-all route for React Router (must be last, after all API routes)
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def catch_all(full_path: str):
+        # Don't catch API routes or static assets
+        if (full_path == "docs" or 
+            full_path == "openapi.json" or
+            full_path.startswith("api/") or 
+            full_path.startswith("generate-presentation") or 
+            full_path.startswith("health") or
+            full_path.startswith("test-exception") or
+            full_path.startswith("assets/") or
+            full_path.startswith("docs/") or
+            full_path.startswith("redoc")):
+            raise HTTPException(status_code=404, detail="Not found")
+        
+        # Serve React app for all other routes
+        if os.path.exists(FRONTEND_INDEX_PATH):
+            return FileResponse(FRONTEND_INDEX_PATH)
+        return {"message": "Frontend not built"}
+else:
+    # Fallback root endpoint if frontend doesn't exist
+    @app.get("/")
+    async def root():
+        """Root endpoint"""
+        return {
+            "message": "AI Google Slides Generator API - Agent-based",
+            "version": "2.0.0",
+            "architecture": "AI Agent with tool calling",
+            "endpoints": {
+                "generate_presentation": "/generate-presentation (POST)"
+            },
+            "note": "Frontend not found. Run: cd ppt-agent-frontend && npm run build"
+        }
 

@@ -1,89 +1,180 @@
-# AI Google Slides Generator
+# 🎨 PPT Agent - AI-Powered Presentation Generator
 
-An **autonomous AI agent** that creates Google Slides presentations from a single prompt using Anthropic Claude API with tool calling and Google Slides API.
+Create stunning presentations with AI in seconds. Powered by Anthropic Claude and Google Slides API.
 
-## Features
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![Python](https://img.shields.io/badge/python-3.10+-green.svg)
+![React](https://img.shields.io/badge/react-18+-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-- 🤖 **True AI Agent**: Uses Anthropic's tool use API for autonomous decision-making
-- 🛠️ **Tool Calling**: Agent can call functions (create_presentation, add_slide, review, refine, finalize)
-- 🔄 **Iterative Refinement**: Agent can review and improve slides before finalizing
-- 📊 **Intelligent Planning**: Agent reasons about presentation structure before creating
-- 🚀 **Autonomous Workflow**: Agent manages the entire presentation creation process
-- 🔗 **Auto-sharing**: Automatically shares presentations with shareable links
-- ⚡ **FastAPI Backend**: Modern async API framework
+## ✨ Features
 
-## Prerequisites
+- 🤖 **AI-Powered Content Generation**: Uses Anthropic Claude API with tool calling for intelligent presentation creation
+- 🎨 **Automatic Professional Design**: Beautiful slides with professional layouts automatically applied
+- ⚡ **Fast Generation**: Create presentations in seconds, not hours
+- 📊 **Customizable**: Specify topic, number of slides, and key points
+- 🔗 **Direct Google Slides Integration**: Presentations are created directly in Google Slides
+- 🚀 **Modern Web Interface**: Beautiful React frontend with shadcn/ui components
+- 🛠️ **Autonomous AI Agent**: Agent makes decisions and uses tools to create complete presentations
+
+## 🚀 Quick Start
+
+### Prerequisites
 
 - Python 3.10 or higher
+- Node.js 18+ (for frontend)
+- Anthropic API key ([Get one here](https://console.anthropic.com/))
 - Google Cloud Project with Slides API and Drive API enabled
 - Google Service Account credentials (JSON file)
-- Anthropic API key
 
-## Setup Instructions
+### Backend Setup
 
-### 1. Clone and Setup Environment
-
+1. **Clone the repository:**
 ```bash
-# Create virtual environment
+git clone https://github.com/yourusername/ppt-agent.git
+cd ppt-agent
+```
+
+2. **Create virtual environment:**
+```bash
 python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-# Activate virtual environment
-# On macOS/Linux:
-source venv/bin/activate
-# On Windows:
-venv\Scripts\activate
-
-# Install dependencies
+3. **Install Python dependencies:**
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment Variables
-
-1. Copy `env.txt` to `.env`:
-   ```bash
-   cp env.txt .env
-   ```
-
-2. Edit `.env` and add your credentials:
-   ```
-   ANTHROPIC_API_KEY=your_anthropic_api_key_here
-   GOOGLE_CREDENTIALS_PATH=credentials/service_account.json
-   AGENT_MAX_ITERATIONS=20
-   AGENT_ENABLE_REVIEW=true
-   AGENT_MODEL=claude-3-5-sonnet-20241022
-   ```
-
-### 3. Setup Google Credentials
-
-1. Place your Google service account JSON credentials file in the `credentials/` directory
-2. Name it `service_account.json` (or update `GOOGLE_CREDENTIALS_PATH` in `.env`)
-
-### 4. Enable Google APIs
-
-Make sure the following APIs are enabled in your Google Cloud Project:
-- Google Slides API
-- Google Drive API
-
-### 5. Grant Permissions
-
-Your service account email needs permission to create and share presentations. You may need to:
-- Share a folder in Google Drive with your service account email (if organizing presentations)
-- Or ensure the service account has appropriate permissions in your workspace
-
-## Running the Application
-
-### Start the FastAPI server:
-
+4. **Set up environment variables:**
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cp .env.example .env
+# Edit .env with your API keys and configuration
 ```
 
-The API will be available at:
-- API: http://localhost:8000
-- Documentation: http://localhost:8000/docs
-- Alternative docs: http://localhost:8000/redoc
+Required environment variables:
+- `ANTHROPIC_API_KEY`: Your Anthropic API key
+- `GOOGLE_CREDENTIALS_PATH`: Path to your Google service account JSON file
+- `DEFAULT_PRESENTATION_ID`: Google Slides presentation ID to edit
 
-## API Usage
+5. **Run the backend:**
+```bash
+# Using the start script
+./start_servers.sh
+
+# Or manually
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+```
+
+The API will be available at `http://localhost:8001`
+
+### Frontend Setup
+
+1. **Navigate to frontend directory:**
+```bash
+cd ppt-agent-frontend
+```
+
+2. **Install dependencies:**
+```bash
+npm install
+```
+
+3. **Set up environment:**
+```bash
+cp .env.example .env
+# Edit .env if needed (defaults to http://localhost:8001)
+```
+
+4. **Run the frontend:**
+```bash
+npm run dev
+```
+
+Visit `http://localhost:5173` to see the interface.
+
+### Using the Start Scripts
+
+For convenience, use the provided scripts:
+
+```bash
+# Start both backend and frontend
+./start_servers.sh
+
+# Stop all servers
+./stop_servers.sh
+```
+
+## 📦 Deployment
+
+### Deploy to Vercel
+
+#### Backend Deployment
+
+1. **Install Vercel CLI:**
+```bash
+npm install -g vercel
+```
+
+2. **Login to Vercel:**
+```bash
+vercel login
+```
+
+3. **Deploy:**
+```bash
+vercel --prod
+```
+
+4. **Set environment variables in Vercel dashboard:**
+   - Go to your project settings
+   - Navigate to Environment Variables
+   - Add the following:
+     - `ANTHROPIC_API_KEY`: Your Anthropic API key
+     - `GOOGLE_CREDENTIALS_PATH`: Path to credentials (for serverless, you may need to base64 encode)
+     - `DEFAULT_PRESENTATION_ID`: Your Google Slides presentation ID
+     - `FRONTEND_URL`: Your frontend URL (for CORS)
+
+#### Frontend Deployment
+
+1. **Navigate to frontend:**
+```bash
+cd ppt-agent-frontend
+```
+
+2. **Update API URL:**
+Create `.env.production`:
+```env
+VITE_API_URL=https://your-backend-url.vercel.app
+```
+
+3. **Deploy:**
+```bash
+vercel --prod
+```
+
+For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md)
+
+## 🛠️ Tech Stack
+
+### Backend
+- **FastAPI**: Modern, fast web framework for building APIs
+- **Anthropic Claude API**: AI model for content generation with tool calling
+- **Google Slides API**: Create and edit presentations
+- **Google Drive API**: Manage file sharing and access
+- **Uvicorn**: ASGI server for FastAPI
+- **Mangum**: ASGI adapter for AWS Lambda/Vercel
+
+### Frontend
+- **React 19**: Modern UI library
+- **TypeScript**: Type-safe JavaScript
+- **Vite**: Fast build tool and dev server
+- **shadcn/ui**: Beautiful, accessible UI components
+- **Tailwind CSS**: Utility-first CSS framework
+- **Framer Motion**: Animation library
+- **Axios**: HTTP client
+
+## 📝 API Documentation
 
 ### Generate Presentation
 
@@ -92,156 +183,126 @@ The API will be available at:
 **Request Body:**
 ```json
 {
-  "prompt": "Create a presentation about artificial intelligence and machine learning"
+  "prompt": "Create a 5-slide presentation about renewable energy, covering solar, wind, hydro, benefits, and future outlook"
 }
 ```
 
 **Response:**
 ```json
 {
-  "presentation_id": "1abc123...",
-  "shareable_link": "https://docs.google.com/presentation/d/1abc123...",
-  "title": "Artificial Intelligence and Machine Learning",
-  "slide_count": 8
+  "presentation_id": "1ssIEyRV9ARbPZcKoUcl1sneIlUsW_p-ipRl7KnRRCDk",
+  "shareable_link": "https://docs.google.com/presentation/d/1ssIEyRV9ARbPZcKoUcl1sneIlUsW_p-ipRl7KnRRCDk/edit",
+  "title": "Renewable Energy",
+  "slide_count": 5
 }
 ```
 
-### Example using curl:
-
-```bash
-curl -X POST "http://localhost:8000/generate-presentation" \
-  -H "Content-Type: application/json" \
-  -d '{"prompt": "Introduction to Python programming for beginners"}'
+**Error Response:**
+```json
+{
+  "error": "Error message",
+  "type": "ErrorType",
+  "detail": "Detailed error information"
+}
 ```
 
-### Example using Python:
+### Health Check
 
-```python
-import requests
+**Endpoint:** `GET /health`
 
-response = requests.post(
-    "http://localhost:8000/generate-presentation",
-    json={"prompt": "Introduction to Python programming for beginners"}
-)
-
-data = response.json()
-print(f"Presentation created: {data['shareable_link']}")
+**Response:**
+```json
+{
+  "status": "healthy",
+  "services": "initialized",
+  "agent": "ready"
+}
 ```
 
-## AI Agent Architecture
+### API Documentation (Swagger)
 
-This project implements a **true AI agent** using Anthropic's tool use API. Unlike simple LLM integration, the agent can:
+Visit `http://localhost:8001/docs` for interactive API documentation.
 
-### How It Works
-
-1. **User sends prompt** → "Create a presentation about AI"
-2. **Agent reasons** → Plans the presentation structure
-3. **Agent uses tools** → Calls functions autonomously:
-   - `create_presentation(title)` - Creates new presentation
-   - `add_slide(layout, title, content)` - Adds slides one by one
-   - `review_presentation()` - Reviews current state
-   - `refine_slide(slide_id, changes)` - Improves slides
-   - `finalize_presentation()` - Shares and completes
-4. **Agent iterates** → Can refine and improve
-5. **Agent completes** → Returns final result
-
-### Agent Workflow Example
-
-```
-User: "Create a presentation about Python"
-  ↓
-Agent: "I'll create a comprehensive presentation about Python programming"
-  ↓
-Agent calls: create_presentation("Introduction to Python")
-  ↓
-Agent: "Now I'll add slides covering key topics"
-  ↓
-Agent calls: add_slide("TITLE", "Introduction to Python", "...")
-Agent calls: add_slide("TITLE_AND_BODY", "What is Python?", "...")
-Agent calls: add_slide("TITLE_AND_BODY", "Python Features", "...")
-  ↓
-Agent calls: review_presentation()
-  ↓
-Agent: "The presentation looks good, but I should refine slide 2"
-  ↓
-Agent calls: refine_slide(2, "Better content...")
-  ↓
-Agent calls: finalize_presentation()
-  ↓
-Done! Returns shareable link
-```
-
-### Key Components
-
-- **Agent Service** (`app/services/agent_service.py`): Main agent loop with Anthropic tool use
-- **Tool Executor** (`app/agent/executor.py`): Executes tool calls and manages state
-- **Tool Definitions** (`app/agent/tools.py`): Defines available tools for the agent
-- **Enhanced Slides Service**: Granular methods for agent tool calls
-
-## API Endpoints
-
-- `GET /` - Root endpoint with API information
-- `GET /health` - Health check endpoint
-- `POST /generate-presentation` - Generate a new presentation from a prompt (uses AI agent)
-
-## Project Structure
+## 🏗️ Project Structure
 
 ```
 ppt_agent/
 ├── app/
 │   ├── __init__.py
 │   ├── main.py                 # FastAPI application
-│   ├── config.py               # Configuration management
+│   ├── config.py               # Configuration settings
 │   ├── agent/
-│   │   ├── __init__.py
-│   │   ├── tools.py            # Tool definitions for agent
-│   │   └── executor.py        # Tool executor and state management
-│   ├── services/
-│   │   ├── agent_service.py    # AI Agent service with tool use
-│   │   ├── llm_service.py      # Simple LLM service (legacy)
-│   │   ├── slides_service.py   # Google Slides API
-│   │   └── drive_service.py    # Google Drive API
+│   │   ├── executor.py         # Tool executor for AI agent
+│   │   └── tools.py            # Available tools for agent
 │   ├── models/
 │   │   └── schemas.py          # Pydantic models
+│   ├── services/
+│   │   ├── agent_service.py    # AI agent service
+│   │   ├── slides_service.py   # Google Slides API service
+│   │   ├── drive_service.py    # Google Drive API service
+│   │   └── llm_service.py      # LLM service
 │   └── utils/
-│       └── auth.py             # Google authentication
-├── credentials/
-│   └── service_account.json    # Your Google credentials (not in repo)
-├── env.txt                     # Environment variables template
-├── .env                        # Your environment variables (not in repo)
-├── requirements.txt
-└── README.md
+│       ├── auth.py             # Google authentication
+│       └── anthropic_safe.py   # Safe Anthropic API wrapper
+├── ppt-agent-frontend/         # React frontend
+│   ├── src/
+│   │   ├── App.tsx             # Main React component
+│   │   ├── main.tsx            # React entry point
+│   │   ├── components/         # React components
+│   │   ├── services/           # API service layer
+│   │   └── lib/                # Utility functions
+│   └── package.json
+├── credentials/                # Google credentials (not in repo)
+├── .env.example                # Environment variables template
+├── requirements.txt            # Python dependencies
+├── vercel.json                 # Vercel configuration
+├── start_servers.sh            # Start script
+├── stop_servers.sh             # Stop script
+└── README.md                   # This file
 ```
 
-## Error Handling
+## 🔧 Configuration
 
-The API includes comprehensive error handling:
-- **400 Bad Request**: Invalid input (e.g., empty prompt)
-- **502 Bad Gateway**: External API errors (Google API, Anthropic API)
-- **500 Internal Server Error**: Unexpected errors
-- **503 Service Unavailable**: Services not initialized
+### Environment Variables
 
-## Troubleshooting
+See `.env.example` for all available configuration options:
 
-### Service Account Credentials Not Found
-- Ensure `service_account.json` is in the `credentials/` directory
-- Or update `GOOGLE_CREDENTIALS_PATH` in `.env`
+- `ANTHROPIC_API_KEY`: Required - Your Anthropic API key
+- `GOOGLE_CREDENTIALS_PATH`: Required - Path to Google service account JSON
+- `DEFAULT_PRESENTATION_ID`: Required - Google Slides presentation ID
+- `GOOGLE_DRIVE_FOLDER_ID`: Optional - Google Drive folder ID
+- `AGENT_MAX_ITERATIONS`: Optional - Maximum agent iterations (default: 20)
+- `AGENT_MODEL`: Optional - Anthropic model to use (default: claude-3-haiku-20240307)
 
-### API Key Not Set
-- Verify `ANTHROPIC_API_KEY` is set in `.env`
-- Check that `.env` file exists and is in the project root
+## 🤝 Contributing
 
-### Google API Errors
-- Verify Google APIs are enabled in your Google Cloud Project
-- Check service account has necessary permissions
-- Ensure credentials JSON is valid
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-### Anthropic API Errors
-- Verify your API key is valid
-- Check your API usage limits
-- Ensure you have sufficient credits
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## License
+## 📄 License
 
-This project is provided as-is for educational and development purposes.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
+## 👨‍💻 Author
+
+**Sharath Kumar**
+
+## 🙏 Acknowledgments
+
+- [Anthropic Claude API](https://www.anthropic.com/) for AI capabilities
+- [Google Slides API](https://developers.google.com/slides) for presentation creation
+- [shadcn/ui](https://ui.shadcn.com/) for beautiful UI components
+- [FastAPI](https://fastapi.tiangolo.com/) for the excellent web framework
+
+## 📞 Support
+
+If you encounter any issues or have questions, please open an issue on GitHub.
+
+---
+
+Made with ❤️ using AI
