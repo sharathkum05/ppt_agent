@@ -207,73 +207,73 @@ try:
             """Middleware that catches all exceptions without touching the exception object"""
             
             async def dispatch(self, request, call_next):
-        print("="*50)
-        print("MIDDLEWARE STARTED")
-        print(f"Request: {request.method} {request.url.path}")
-        print("="*50)
-        
-        try:
-            response = await call_next(request)
-            print("MIDDLEWARE: Request completed successfully")
-            return response
-        except Exception as e:
-            print("="*50)
-            print(f"MIDDLEWARE CAUGHT EXCEPTION: {type(e).__module__}.{type(e).__name__}")
-            print("="*50)
-            
-            # Use sys.exc_info() to get type info without touching the exception
-            import sys
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            
-            if exc_type:
+                print("="*50)
+                print("MIDDLEWARE STARTED")
+                print(f"Request: {request.method} {request.url.path}")
+                print("="*50)
+                
                 try:
-                    error_module = getattr(exc_type, '__module__', '')
-                    error_name = getattr(exc_type, '__name__', 'Unknown')
-                except:
-                    error_module = 'unknown'
-                    error_name = 'Unknown'
-                
-                print(f"MIDDLEWARE: Exception type: {error_module}.{error_name}")
-                
-                # Check if it's an Anthropic error by module name
-                if 'anthropic' in error_module:
-                    print("MIDDLEWARE: Returning Anthropic error response")
+                    response = await call_next(request)
+                    print("MIDDLEWARE: Request completed successfully")
+                    return response
+                except Exception as e:
+                    print("="*50)
+                    print(f"MIDDLEWARE CAUGHT EXCEPTION: {type(e).__module__}.{type(e).__name__}")
+                    print("="*50)
+                    
+                    # Use sys.exc_info() to get type info without touching the exception
+                    import sys
+                    exc_type, exc_value, exc_traceback = sys.exc_info()
+                    
+                    if exc_type:
+                        try:
+                            error_module = getattr(exc_type, '__module__', '')
+                            error_name = getattr(exc_type, '__name__', 'Unknown')
+                        except:
+                            error_module = 'unknown'
+                            error_name = 'Unknown'
+                        
+                        print(f"MIDDLEWARE: Exception type: {error_module}.{error_name}")
+                        
+                        # Check if it's an Anthropic error by module name
+                        if 'anthropic' in error_module:
+                            print("MIDDLEWARE: Returning Anthropic error response")
+                            return JSONResponse(
+                                status_code=500,
+                                content={
+                                    "error": "CAUGHT BY MIDDLEWARE - Anthropic API request failed",
+                                    "type": error_name,
+                                    "detail": "An error occurred while communicating with the AI service"
+                                }
+                            )
+                        
+                        # For HTTPException, try to extract info safely
+                        if error_name == 'HTTPException':
+                            try:
+                                status_code = getattr(exc_value, 'status_code', 500) if exc_value else 500
+                                detail = getattr(exc_value, 'detail', 'An error occurred') if exc_value else 'An error occurred'
+                                print(f"MIDDLEWARE: Returning HTTPException response: {status_code}")
+                                return JSONResponse(
+                                    status_code=status_code,
+                                    content={
+                                        "error": f"CAUGHT BY MIDDLEWARE - {detail}",
+                                        "type": error_name,
+                                        "detail": None
+                                    }
+                                )
+                            except:
+                                pass
+                    
+                    # Other exceptions - generic response
+                    print("MIDDLEWARE: Returning generic error response")
                     return JSONResponse(
                         status_code=500,
                         content={
-                            "error": "CAUGHT BY MIDDLEWARE - Anthropic API request failed",
-                            "type": error_name,
-                            "detail": "An error occurred while communicating with the AI service"
+                            "error": "CAUGHT BY MIDDLEWARE - An unexpected error occurred",
+                            "type": error_name if exc_type else "Unknown",
+                            "detail": None
                         }
                     )
-                
-                # For HTTPException, try to extract info safely
-                if error_name == 'HTTPException':
-                    try:
-                        status_code = getattr(exc_value, 'status_code', 500) if exc_value else 500
-                        detail = getattr(exc_value, 'detail', 'An error occurred') if exc_value else 'An error occurred'
-                        print(f"MIDDLEWARE: Returning HTTPException response: {status_code}")
-                        return JSONResponse(
-                            status_code=status_code,
-                            content={
-                                "error": f"CAUGHT BY MIDDLEWARE - {detail}",
-                                "type": error_name,
-                                "detail": None
-                            }
-                        )
-                    except:
-                        pass
-            
-            # Other exceptions - generic response
-            print("MIDDLEWARE: Returning generic error response")
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "error": "CAUGHT BY MIDDLEWARE - An unexpected error occurred",
-                    "type": error_name if exc_type else "Unknown",
-                    "detail": None
-                }
-            )
 except NameError:
     # BaseHTTPMiddleware not available, skip middleware
     SafeExceptionMiddleware = None
