@@ -238,21 +238,82 @@ async def test_exception():
 async def debug_env():
     """Debug endpoint to check environment variables (without exposing sensitive data)"""
     import os
-    env_vars = {
-        "ANTHROPIC_API_KEY": "SET" if os.getenv("ANTHROPIC_API_KEY") else "MISSING",
-        "GOOGLE_PROJECT_ID": "SET" if os.getenv("GOOGLE_PROJECT_ID") else "MISSING",
-        "project_id": "SET" if os.getenv("project_id") else "MISSING",
-        "GOOGLE_PRIVATE_KEY": "SET" if os.getenv("GOOGLE_PRIVATE_KEY") else "MISSING",
-        "private_key": "SET" if os.getenv("private_key") else "MISSING",
-        "GOOGLE_CLIENT_EMAIL": "SET" if os.getenv("GOOGLE_CLIENT_EMAIL") else "MISSING",
-        "client_email": "SET" if os.getenv("client_email") else "MISSING",
-        "GOOGLE_TOKEN_URI": "SET" if os.getenv("GOOGLE_TOKEN_URI") else "MISSING",
-        "token_uri": "SET" if os.getenv("token_uri") else "MISSING",
-        "DEFAULT_PRESENTATION_ID": os.getenv("DEFAULT_PRESENTATION_ID", "MISSING"),
-        "GOOGLE_DRIVE_FOLDER_ID": os.getenv("GOOGLE_DRIVE_FOLDER_ID", "MISSING"),
-        "AGENT_MODEL": os.getenv("AGENT_MODEL", "MISSING"),
+    
+    # Check all possible environment variable names
+    def check_var(*names):
+        """Check if any of the given variable names are set"""
+        for name in names:
+            value = os.getenv(name)
+            if value:
+                return "SET", len(value) if value else 0
+        return "MISSING", 0
+    
+    def get_var(*names, default="MISSING"):
+        """Get value of first found variable, or default"""
+        for name in names:
+            value = os.getenv(name)
+            if value:
+                return value
+        return default
+    
+    env_status = {
+        "anthropic": {
+            "ANTHROPIC_API_KEY": check_var("ANTHROPIC_API_KEY"),
+        },
+        "google_credentials": {
+            "project_id": check_var("GOOGLE_PROJECT_ID", "project_id"),
+            "private_key": check_var("GOOGLE_PRIVATE_KEY", "private_key"),
+            "client_email": check_var("GOOGLE_CLIENT_EMAIL", "client_email"),
+            "token_uri": check_var("GOOGLE_TOKEN_URI", "token_uri"),
+            "private_key_id": check_var("GOOGLE_PRIVATE_KEY_ID", "private_key_id"),
+            "client_id": check_var("GOOGLE_CLIENT_ID", "client_id"),
+            "auth_uri": check_var("GOOGLE_AUTH_URI", "auth_uri"),
+            "auth_provider_x509_cert_url": check_var("GOOGLE_AUTH_PROVIDER_X509_CERT_URL", "auth_provider_x509_cert_url"),
+            "client_x509_cert_url": check_var("GOOGLE_CLIENT_X509_CERT_URL", "client_x509_cert_url"),
+            "universe_domain": check_var("GOOGLE_UNIVERSE_DOMAIN", "universe_domain"),
+        },
+        "application": {
+            "DEFAULT_PRESENTATION_ID": get_var("DEFAULT_PRESENTATION_ID"),
+            "GOOGLE_DRIVE_FOLDER_ID": get_var("GOOGLE_DRIVE_FOLDER_ID"),
+            "AGENT_MODEL": get_var("AGENT_MODEL", default="claude-3-5-sonnet-20241022"),
+            "AGENT_MAX_ITERATIONS": get_var("AGENT_MAX_ITERATIONS", default="20"),
+        },
+        "validation": {
+            "using_env_vars": settings.is_using_env_vars(),
+            "validation_errors": []
+        }
     }
-    return {"environment_variables": env_vars}
+    
+    # Try to validate and capture errors
+    try:
+        settings.validate()
+        env_status["validation"]["status"] = "PASSED"
+    except Exception as e:
+        env_status["validation"]["status"] = "FAILED"
+        env_status["validation"]["validation_errors"] = str(e)
+    
+    # Count missing required vars
+    missing_required = []
+    if env_status["anthropic"]["ANTHROPIC_API_KEY"][0] == "MISSING":
+        missing_required.append("ANTHROPIC_API_KEY")
+    
+    if env_status["validation"]["using_env_vars"]:
+        if env_status["google_credentials"]["project_id"][0] == "MISSING":
+            missing_required.append("GOOGLE_PROJECT_ID or project_id")
+        if env_status["google_credentials"]["private_key"][0] == "MISSING":
+            missing_required.append("GOOGLE_PRIVATE_KEY or private_key")
+        if env_status["google_credentials"]["client_email"][0] == "MISSING":
+            missing_required.append("GOOGLE_CLIENT_EMAIL or client_email")
+        if env_status["google_credentials"]["token_uri"][0] == "MISSING":
+            missing_required.append("GOOGLE_TOKEN_URI or token_uri")
+    
+    env_status["summary"] = {
+        "total_checked": len(env_status["anthropic"]) + len(env_status["google_credentials"]) + len(env_status["application"]),
+        "missing_required": missing_required,
+        "all_required_set": len(missing_required) == 0
+    }
+    
+    return env_status
 
 @app.post("/generate-presentation", response_model=PresentationResponse)
 async def generate_presentation(request: PresentationRequest):

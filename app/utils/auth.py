@@ -48,12 +48,18 @@ def get_google_credentials():
             raise ValueError(f"Failed to load Google credentials from env vars: {error_msg}")
     
     # Fall back to file path (for local development)
-    creds_path = settings.google_credentials_path
-    
-    if not creds_path.exists():
+    # Safely get the path without failing if it doesn't exist
+    try:
+        creds_path = settings.google_credentials_path
+        if not creds_path.exists():
+            raise FileNotFoundError(
+                f"Google credentials file not found at: {creds_path}. "
+                "Either provide a file or set environment variables."
+            )
+    except (OSError, RuntimeError) as e:
         raise FileNotFoundError(
-            f"Google credentials file not found at: {creds_path}. "
-            "Either provide a file or set environment variables."
+            f"Could not resolve Google credentials path: {str(e)}. "
+            "Please set Google credentials as environment variables."
         )
     
     try:

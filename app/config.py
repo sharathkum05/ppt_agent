@@ -43,43 +43,79 @@ class Settings:
     
     @property
     def google_credentials_path(self) -> Path:
-        """Get absolute path to Google credentials file"""
-        return Path(self.GOOGLE_CREDENTIALS_PATH).resolve()
+        """Get absolute path to Google credentials file (safe - doesn't fail if path doesn't exist)"""
+        try:
+            # Try to resolve the path, but don't fail if it doesn't exist
+            path = Path(self.GOOGLE_CREDENTIALS_PATH)
+            if path.is_absolute():
+                return path
+            # For relative paths, try to resolve, but catch errors
+            try:
+                return path.resolve()
+            except (OSError, RuntimeError):
+                # If resolve fails, return the path as-is
+                return path
+        except Exception:
+            # If anything fails, return a Path object anyway
+            return Path(self.GOOGLE_CREDENTIALS_PATH)
+    
+    def is_using_env_vars(self) -> bool:
+        """Check if we're using environment variables for Google credentials"""
+        return bool(os.getenv("GOOGLE_PROJECT_ID") or os.getenv("project_id"))
     
     def validate(self) -> None:
-        """Validate that required settings are present"""
-        if not self.ANTHROPIC_API_KEY:
-            raise ValueError("ANTHROPIC_API_KEY environment variable is required")
+        """Validate that required settings are present (safe - doesn't crash on missing paths)"""
+        errors = []
         
-        # Check if using environment variables (for Vercel/serverless)
-        # If project_id or GOOGLE_PROJECT_ID is set, we're using env vars
-        if os.getenv("GOOGLE_PROJECT_ID") or os.getenv("project_id"):
-            # Validate required Google env vars are present
-            required_google_vars = [
-                "GOOGLE_PROJECT_ID", "project_id",
-                "GOOGLE_PRIVATE_KEY", "private_key",
-                "GOOGLE_CLIENT_EMAIL", "client_email",
-                "GOOGLE_TOKEN_URI", "token_uri"
-            ]
-            has_required = False
-            for var in required_google_vars:
-                if os.getenv(var):
-                    has_required = True
-                    break
+        # Check Anthropic API key
+        if not self.ANTHROPIC_API_KEY:
+            errors.append("ANTHROPIC_API_KEY environment variable is required")
+        
+        # Check Google credentials
+        if self.is_using_env_vars():
+            # Using environment variables (Vercel/serverless)
+            missing_vars = []
             
-            if not has_required:
-                raise ValueError(
-                    "Google credentials environment variables not found. "
-                    "Either set GOOGLE_PROJECT_ID (or project_id) and related vars, "
-                    "or provide a credentials file."
+            # Check for project_id (either GOOGLE_PROJECT_ID or project_id)
+            if not (os.getenv("GOOGLE_PROJECT_ID") or os.getenv("project_id")):
+                missing_vars.append("GOOGLE_PROJECT_ID or project_id")
+            
+            # Check for private_key (either GOOGLE_PRIVATE_KEY or private_key)
+            if not (os.getenv("GOOGLE_PRIVATE_KEY") or os.getenv("private_key")):
+                missing_vars.append("GOOGLE_PRIVATE_KEY or private_key")
+            
+            # Check for client_email (either GOOGLE_CLIENT_EMAIL or client_email)
+            if not (os.getenv("GOOGLE_CLIENT_EMAIL") or os.getenv("client_email")):
+                missing_vars.append("GOOGLE_CLIENT_EMAIL or client_email")
+            
+            # Check for token_uri (either GOOGLE_TOKEN_URI or token_uri)
+            if not (os.getenv("GOOGLE_TOKEN_URI") or os.getenv("token_uri")):
+                missing_vars.append("GOOGLE_TOKEN_URI or token_uri")
+            
+            if missing_vars:
+                errors.append(
+                    f"Missing Google credentials environment variables: {', '.join(missing_vars)}. "
+                    "Please set these in Vercel environment variables."
                 )
         else:
             # Using file-based credentials (local development)
-            if not self.google_credentials_path.exists():
-                raise FileNotFoundError(
-                    f"Google credentials file not found at: {self.google_credentials_path}. "
-                    "Either provide a file or set Google credentials as environment variables."
+            # Only check if file exists, don't fail on path resolution
+            try:
+                creds_path = self.google_credentials_path
+                if not creds_path.exists():
+                    errors.append(
+                        f"Google credentials file not found at: {creds_path}. "
+                        "Either provide a file or set Google credentials as environment variables."
+                    )
+            except Exception as e:
+                # If path resolution fails, that's okay - we'll try env vars
+                errors.append(
+                    f"Could not resolve credentials path: {str(e)}. "
+                    "Please set Google credentials as environment variables for serverless deployment."
                 )
+        
+        if errors:
+            raise ValueError("; ".join(errors))
 
 
 # Global settings instance
