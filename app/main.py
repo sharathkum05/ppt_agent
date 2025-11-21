@@ -1,6 +1,12 @@
 """FastAPI application for AI-powered Google Slides generation - Fixed version"""
 import sys
 import logging
+import traceback
+
+# Print to stderr immediately (Vercel captures this)
+print("=" * 60, file=sys.stderr)
+print("Starting application...", file=sys.stderr)
+print("=" * 60, file=sys.stderr)
 
 # Configure logging to stderr (Vercel captures this)
 logging.basicConfig(
@@ -10,47 +16,64 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-logger.info("=" * 60)
-logger.info("Starting application...")
-logger.info("=" * 60)
+# Initialize app and handler as None - will be set below
+app = None
+handler = None
 
-# Step 1: Import FastAPI (most critical)
+# Step 1: Import FastAPI (most critical) - NEVER exit, always create handler
 try:
     from fastapi import FastAPI
     from fastapi.responses import JSONResponse
+    print("✅ FastAPI imported successfully", file=sys.stderr)
     logger.info("✅ FastAPI imported successfully")
 except Exception as e:
+    print(f"❌ Failed to import FastAPI: {e}", file=sys.stderr)
+    print(traceback.format_exc(), file=sys.stderr)
     logger.error(f"❌ Failed to import FastAPI: {e}", exc_info=True)
-    sys.exit(1)
+    # Don't exit - create minimal handler instead
 
-# Step 2: Create app
+# Step 2: Create app - NEVER exit, always create handler
 try:
-    app = FastAPI(
-        title="AI Google Slides Generator",
-        description="AI Agent that generates Google Slides presentations",
-        version="2.0.0"
-    )
-    logger.info("✅ FastAPI app created")
+    if FastAPI:
+        app = FastAPI(
+            title="AI Google Slides Generator",
+            description="AI Agent that generates Google Slides presentations",
+            version="2.0.0"
+        )
+        print("✅ FastAPI app created", file=sys.stderr)
+        logger.info("✅ FastAPI app created")
 except Exception as e:
+    print(f"❌ Failed to create FastAPI app: {e}", file=sys.stderr)
+    print(traceback.format_exc(), file=sys.stderr)
     logger.error(f"❌ Failed to create FastAPI app: {e}", exc_info=True)
-    sys.exit(1)
+    # Don't exit - will create minimal handler
 
 # Step 3: Add basic routes (no dependencies on other modules)
-@app.get("/")
-async def root():
-    """Root endpoint"""
-    return {
-        "status": "ok",
-        "message": "AI Google Slides Generator API",
-        "version": "2.0.0"
-    }
+# Only add routes if app was created successfully
+if app:
+    try:
+        @app.get("/")
+        async def root():
+            """Root endpoint"""
+            return {
+                "status": "ok",
+                "message": "AI Google Slides Generator API",
+                "version": "2.0.0"
+            }
 
-@app.get("/health")
-async def health():
-    """Health check"""
-    return {"status": "healthy"}
-
-logger.info("✅ Basic routes added")
+        @app.get("/health")
+        async def health():
+            """Health check"""
+            return {"status": "healthy"}
+        
+        print("✅ Basic routes added", file=sys.stderr)
+        logger.info("✅ Basic routes added")
+    except Exception as e:
+        print(f"⚠️ Failed to add basic routes: {e}", file=sys.stderr)
+        logger.warning(f"⚠️ Failed to add basic routes: {e}")
+else:
+    print("⚠️ App not created, skipping routes", file=sys.stderr)
+    logger.warning("⚠️ App not created, skipping routes")
 
 # Step 4: Try to import and add full functionality
 try:
@@ -143,12 +166,30 @@ except Exception as e:
     handler = minimal_handler
     logger.warning("⚠️ Using fallback handler")
 
-# Final check
+# Final check - ALWAYS ensure handler exists (NEVER exit)
 if handler is None:
-    logger.error("❌ CRITICAL: Handler is None!")
-    sys.exit(1)
+    print("❌ CRITICAL: Handler is None! Creating emergency handler", file=sys.stderr)
+    logger.error("❌ CRITICAL: Handler is None! Creating emergency handler")
+    
+    # Emergency fallback handler
+    async def emergency_handler(scope, receive, send):
+        from starlette.responses import JSONResponse
+        response = JSONResponse(
+            {"error": "Handler not properly initialized", "status": "error"},
+            status_code=500
+        )
+        await response(scope, receive, send)
+    handler = emergency_handler
+    print("✅ Emergency handler created", file=sys.stderr)
+
+print("=" * 60, file=sys.stderr)
+print("Application startup complete!", file=sys.stderr)
+print(f"Handler type: {type(handler)}", file=sys.stderr)
+print(f"App type: {type(app) if app else 'None'}", file=sys.stderr)
+print("=" * 60, file=sys.stderr)
 
 logger.info("=" * 60)
 logger.info("Application startup complete!")
 logger.info(f"Handler type: {type(handler)}")
+logger.info(f"App type: {type(app) if app else 'None'}")
 logger.info("=" * 60)
