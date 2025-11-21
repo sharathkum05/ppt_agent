@@ -81,95 +81,117 @@ else:
     print("⚠️ App not created, skipping routes", file=sys.stderr)
     logger.warning("⚠️ App not created, skipping routes")
 
-# Step 4: Try to import and add full functionality
-try:
-    from app.config import settings
-    from app.utils.auth import get_google_services
-    from app.services.agent_service import AgentService
-    from app.services.slides_service import SlidesService
-    from app.services.drive_service import DriveService
-    from app.models.schemas import PresentationRequest, PresentationResponse
-    
-    # Initialize services (will be done on first request)
-    agent_service = None
-    slides_service = None
-    drive_service = None
-    
-    def initialize_services():
-        """Initialize Google and Agent services"""
-        global agent_service, slides_service, drive_service
-        try:
-            settings.validate()
-            slides_api, drive_api = get_google_services()
-            slides_service = SlidesService(slides_api)
-            drive_service = DriveService(drive_api)
-            agent_service = AgentService(slides_service, drive_service)
-            logger.info("✅ Services initialized successfully")
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize services: {e}", exc_info=True)
-            raise
-    
-    @app.post("/generate-presentation")
-    async def generate_presentation(request: PresentationRequest):
-        """Generate a Google Slides presentation"""
-        if agent_service is None or slides_service is None or drive_service is None:
-            try:
-                initialize_services()
-            except Exception as e:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to initialize services: {str(e)}"
-                )
+# Step 4: Try to import and add full functionality (only if app exists)
+if app:
+    try:
+        from fastapi import HTTPException
+        from app.config import settings
+        from app.utils.auth import get_google_services
+        from app.services.agent_service import AgentService
+        from app.services.slides_service import SlidesService
+        from app.services.drive_service import DriveService
+        from app.models.schemas import PresentationRequest, PresentationResponse
         
-        result = agent_service.generate_presentation(request.prompt)
-        return PresentationResponse(
-            presentation_id=result["presentation_id"],
-            shareable_link=result["shareable_link"],
-            title=result["title"],
-            slide_count=result["slide_count"]
-        )
-    
-    @app.get("/debug/env")
-    async def debug_env():
-        """Debug endpoint to check environment variables"""
-        import os
-        env_status = {
-            "anthropic": {
-                "ANTHROPIC_API_KEY": "SET" if os.getenv("ANTHROPIC_API_KEY") else "MISSING",
-            },
-            "google_credentials": {
-                "project_id": "SET" if (os.getenv("GOOGLE_PROJECT_ID") or os.getenv("project_id")) else "MISSING",
-                "private_key": "SET" if (os.getenv("GOOGLE_PRIVATE_KEY") or os.getenv("private_key")) else "MISSING",
-                "client_email": "SET" if (os.getenv("GOOGLE_CLIENT_EMAIL") or os.getenv("client_email")) else "MISSING",
-                "token_uri": "SET" if (os.getenv("GOOGLE_TOKEN_URI") or os.getenv("token_uri")) else "MISSING",
-            },
-            "application": {
-                "DEFAULT_PRESENTATION_ID": os.getenv("DEFAULT_PRESENTATION_ID", "MISSING"),
-                "GOOGLE_DRIVE_FOLDER_ID": os.getenv("GOOGLE_DRIVE_FOLDER_ID", "MISSING"),
+        # Initialize services (will be done on first request)
+        agent_service = None
+        slides_service = None
+        drive_service = None
+        
+        def initialize_services():
+            """Initialize Google and Agent services"""
+            global agent_service, slides_service, drive_service
+            try:
+                settings.validate()
+                slides_api, drive_api = get_google_services()
+                slides_service = SlidesService(slides_api)
+                drive_service = DriveService(drive_api)
+                agent_service = AgentService(slides_service, drive_service)
+                logger.info("✅ Services initialized successfully")
+            except Exception as e:
+                logger.error(f"❌ Failed to initialize services: {e}", exc_info=True)
+                raise
+        
+        @app.post("/generate-presentation")
+        async def generate_presentation(request: PresentationRequest):
+            """Generate a Google Slides presentation"""
+            if agent_service is None or slides_service is None or drive_service is None:
+                try:
+                    initialize_services()
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to initialize services: {str(e)}"
+                    )
+            
+            result = agent_service.generate_presentation(request.prompt)
+            return PresentationResponse(
+                presentation_id=result["presentation_id"],
+                shareable_link=result["shareable_link"],
+                title=result["title"],
+                slide_count=result["slide_count"]
+            )
+        
+        @app.get("/debug/env")
+        async def debug_env():
+            """Debug endpoint to check environment variables"""
+            import os
+            env_status = {
+                "anthropic": {
+                    "ANTHROPIC_API_KEY": "SET" if os.getenv("ANTHROPIC_API_KEY") else "MISSING",
+                },
+                "google_credentials": {
+                    "project_id": "SET" if (os.getenv("GOOGLE_PROJECT_ID") or os.getenv("project_id")) else "MISSING",
+                    "private_key": "SET" if (os.getenv("GOOGLE_PRIVATE_KEY") or os.getenv("private_key")) else "MISSING",
+                    "client_email": "SET" if (os.getenv("GOOGLE_CLIENT_EMAIL") or os.getenv("client_email")) else "MISSING",
+                    "token_uri": "SET" if (os.getenv("GOOGLE_TOKEN_URI") or os.getenv("token_uri")) else "MISSING",
+                },
+                "application": {
+                    "DEFAULT_PRESENTATION_ID": os.getenv("DEFAULT_PRESENTATION_ID", "MISSING"),
+                    "GOOGLE_DRIVE_FOLDER_ID": os.getenv("GOOGLE_DRIVE_FOLDER_ID", "MISSING"),
+                }
             }
-        }
-        return env_status
-    
-    logger.info("✅ Full functionality imported and routes added")
-    
-except Exception as e:
-    logger.warning(f"⚠️ Could not import full functionality: {e}")
-    logger.warning("⚠️ App will run in basic mode (root and health endpoints only)")
-    # App still works with basic routes
+            return env_status
+        
+        print("✅ Full functionality imported and routes added", file=sys.stderr)
+        logger.info("✅ Full functionality imported and routes added")
+        
+    except Exception as e:
+        print(f"⚠️ Could not import full functionality: {e}", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
+        logger.warning(f"⚠️ Could not import full functionality: {e}")
+        logger.warning("⚠️ App will run in basic mode (root and health endpoints only)")
+        # App still works with basic routes
+else:
+    print("⚠️ App not available, skipping full functionality", file=sys.stderr)
+    logger.warning("⚠️ App not available, skipping full functionality")
 
-# Step 5: Create handler (CRITICAL for Vercel)
+# Step 5: Create handler (CRITICAL for Vercel) - ALWAYS create handler
 try:
     from mangum import Mangum
-    handler = Mangum(app, lifespan="off")
-    logger.info("✅ Mangum handler created successfully")
+    if app:
+        handler = Mangum(app, lifespan="off")
+        print("✅ Mangum handler created successfully", file=sys.stderr)
+        logger.info("✅ Mangum handler created successfully")
+    else:
+        # App is None, create minimal handler
+        print("⚠️ App is None, creating minimal handler", file=sys.stderr)
+        async def minimal_handler(scope, receive, send):
+            from starlette.responses import JSONResponse
+            response = JSONResponse({"error": "FastAPI app not initialized"}, status_code=500)
+            await response(scope, receive, send)
+        handler = minimal_handler
+        print("✅ Minimal handler created", file=sys.stderr)
 except Exception as e:
+    print(f"❌ Failed to create Mangum handler: {e}", file=sys.stderr)
+    print(traceback.format_exc(), file=sys.stderr)
     logger.error(f"❌ Failed to create Mangum handler: {e}", exc_info=True)
     # Last resort - create minimal ASGI app
     async def minimal_handler(scope, receive, send):
         from starlette.responses import JSONResponse
-        response = JSONResponse({"error": "Handler initialization failed", "detail": str(e)})
+        response = JSONResponse({"error": "Handler initialization failed", "detail": str(e)}, status_code=500)
         await response(scope, receive, send)
     handler = minimal_handler
+    print("⚠️ Using fallback handler", file=sys.stderr)
     logger.warning("⚠️ Using fallback handler")
 
 # Final check - ALWAYS ensure handler exists (NEVER exit)
