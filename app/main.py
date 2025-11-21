@@ -92,6 +92,13 @@ try:
     # If we had import errors, log them but continue
     if import_error:
         logger.warning(f"Some imports failed, but continuing: {import_error}")
+    
+    # Initialize FastAPI app (only if we got here successfully)
+    app = FastAPI(
+        title="AI Google Slides Generator",
+        description="AI Agent that generates Google Slides presentations using Anthropic Claude with tool calling",
+        version="2.0.0"
+    )
 
 except Exception as e:
     # If ANY import fails, we need to handle it gracefully
@@ -135,8 +142,37 @@ except Exception as e:
         pass
     
     # DO NOT re-raise - we need handler to be defined
-    # Log the error but continue so handler can be created
-    logger.error(f"Import failed but continuing to create handler: {e}")
+    # Write error to stderr so it appears in Vercel logs
+    import sys
+    import traceback
+    error_msg = f"CRITICAL: Import failed: {e}\n{traceback.format_exc()}"
+    print(error_msg, file=sys.stderr)
+    logger.error(error_msg)
+    
+    # Ensure we have a minimal app and handler
+    try:
+        from fastapi import FastAPI
+        from fastapi.responses import JSONResponse
+        app = FastAPI(title="Error", version="1.0.0")
+        
+        @app.get("/")
+        async def error_root():
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "Application failed to start",
+                    "detail": str(e),
+                    "type": type(e).__name__,
+                    "message": "Check Vercel function logs for details"
+                }
+            )
+    except Exception as app_error:
+        # If we can't even create FastAPI app, we're in trouble
+        print(f"CRITICAL: Cannot create FastAPI app: {app_error}", file=sys.stderr)
+        # Create a minimal app-like object
+        class MinimalApp:
+            pass
+        app = MinimalApp()
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -472,17 +508,47 @@ except Exception as e:
     logger.error(f"CRITICAL: Failed to initialize Mangum handler: {e}", exc_info=True)
     handler = None
 
-# CRITICAL: Handler MUST be defined for Vercel
+# CRITICAL: Handler MUST be defined for Vercel - this is the last line of defense
 if handler is None:
-    logger.error("CRITICAL: Handler is None - attempting to create minimal handler")
+    import sys
+    error_msg = "CRITICAL: Handler is None - attempting to create minimal handler"
+    print(error_msg, file=sys.stderr)
+    logger.error(error_msg)
     try:
         from mangum import Mangum
         handler = Mangum(app, lifespan="off")
+        print("✅ Created Mangum handler as fallback", file=sys.stderr)
         logger.info("✅ Created Mangum handler as fallback")
     except Exception as e:
-        logger.error(f"CRITICAL: Cannot create handler: {e}", exc_info=True)
-        # Last resort - export app directly (Vercel might handle it)
-        handler = app
+        error_msg = f"CRITICAL: Cannot create handler: {e}"
+        print(error_msg, file=sys.stderr)
+        import traceback
+        print(traceback.format_exc(), file=sys.stderr)
+        logger.error(error_msg, exc_info=True)
+        # Last resort - try to create a basic ASGI app
+        async def minimal_asgi_app(scope, receive, send):
+            from starlette.responses import JSONResponse
+            response = JSONResponse(
+                status_code=500,
+                content={"error": "Handler initialization failed", "detail": str(e)}
+            )
+            await response(scope, receive, send)
+        handler = minimal_asgi_app
+
+# FINAL CHECK: Ensure handler exists (Vercel will fail if it doesn't)
+if handler is None:
+    import sys
+    print("FATAL: Handler is still None - this will cause deployment failure", file=sys.stderr)
+    # Create absolute minimal handler
+    async def fatal_handler(scope, receive, send):
+        from starlette.responses import PlainTextResponse
+        response = PlainTextResponse("Handler not initialized", status_code=500)
+        await response(scope, receive, send)
+    handler = fatal_handler
+
+# Log successful handler creation
+import sys
+print(f"✅ Handler initialized: {type(handler).__name__}", file=sys.stderr)
 
 # Serve React frontend (after building with: cd ppt-agent-frontend && npm run build)
 from fastapi.staticfiles import StaticFiles
