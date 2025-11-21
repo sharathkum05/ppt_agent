@@ -1,57 +1,133 @@
 """FastAPI application for AI-powered Google Slides generation"""
 import sys
 import logging
+import os
 
-# MONKEY PATCH: Fix APIError instantiation issue BEFORE importing anything else
-# This must be done before any anthropic imports
-try:
-    import anthropic
-    from anthropic import APIError as OriginalAPIError
-    
-    # Wrapper that handles missing 'request' argument
-    class SafeAPIError(OriginalAPIError):
-        def __init__(self, *args, **kwargs):
-            # If 'request' is missing and not enough args provided, add a dummy request
-            if 'request' not in kwargs and len(args) < 2:
-                kwargs['request'] = None
-            try:
-                super().__init__(*args, **kwargs)
-            except (TypeError, AttributeError):
-                # If it still fails, create a minimal error object
-                self.message = str(args[0]) if args else "API Error"
-                self.status_code = getattr(kwargs.get('request'), 'status_code', None) or 500
-                self.body = kwargs.get('body', {})
-    
-    # Replace in the module
-    anthropic.APIError = SafeAPIError
-    sys.modules['anthropic'].APIError = SafeAPIError
-    
-    # Import the patched version
-    from anthropic import APIError, AuthenticationError, NotFoundError, PermissionDeniedError, RateLimitError
-except Exception as e:
-    # If monkey patch fails, use original imports
-    logging.warning(f"Failed to apply APIError monkey patch: {e}")
-    from anthropic import APIError, AuthenticationError, NotFoundError, PermissionDeniedError, RateLimitError
-
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from googleapiclient.errors import HttpError
-
-from app.config import settings
-from app.utils.auth import get_google_services
-from app.services.agent_service import AgentService
-from app.services.slides_service import SlidesService
-from app.services.drive_service import DriveService
-from app.models.schemas import (
-    PresentationRequest,
-    PresentationResponse,
-    ErrorResponse
-)
-
-# Configure logging
+# Configure logging FIRST to catch any errors
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
+
+# Try to import and setup everything safely
+try:
+    # MONKEY PATCH: Fix APIError instantiation issue BEFORE importing anything else
+    # This must be done before any anthropic imports
+    try:
+        import anthropic
+        from anthropic import APIError as OriginalAPIError
+        
+        # Wrapper that handles missing 'request' argument
+        class SafeAPIError(OriginalAPIError):
+            def __init__(self, *args, **kwargs):
+                # If 'request' is missing and not enough args provided, add a dummy request
+                if 'request' not in kwargs and len(args) < 2:
+                    kwargs['request'] = None
+                try:
+                    super().__init__(*args, **kwargs)
+                except (TypeError, AttributeError):
+                    # If it still fails, create a minimal error object
+                    self.message = str(args[0]) if args else "API Error"
+                    self.status_code = getattr(kwargs.get('request'), 'status_code', None) or 500
+                    self.body = kwargs.get('body', {})
+        
+        # Replace in the module
+        anthropic.APIError = SafeAPIError
+        sys.modules['anthropic'].APIError = SafeAPIError
+        
+        # Import the patched version
+        from anthropic import APIError, AuthenticationError, NotFoundError, PermissionDeniedError, RateLimitError
+    except Exception as e:
+        # If monkey patch fails, use original imports
+        logger.warning(f"Failed to apply APIError monkey patch: {e}")
+        try:
+            from anthropic import APIError, AuthenticationError, NotFoundError, PermissionDeniedError, RateLimitError
+        except ImportError:
+            # If anthropic is not available, create dummy classes
+            class APIError(Exception): pass
+            class AuthenticationError(Exception): pass
+            class NotFoundError(Exception): pass
+            class PermissionDeniedError(Exception): pass
+            class RateLimitError(Exception): pass
+
+    from fastapi import FastAPI, HTTPException, Request
+    from fastapi.responses import JSONResponse
+    from starlette.middleware.base import BaseHTTPMiddleware
+    from googleapiclient.errors import HttpError
+
+    # Import app modules - wrap in try-except to prevent crashes
+    try:
+        from app.config import settings
+    except Exception as e:
+        logger.error(f"Failed to import app.config: {e}")
+        raise
+    
+    try:
+        from app.utils.auth import get_google_services
+    except Exception as e:
+        logger.error(f"Failed to import app.utils.auth: {e}")
+        raise
+    
+    try:
+        from app.services.agent_service import AgentService
+        from app.services.slides_service import SlidesService
+        from app.services.drive_service import DriveService
+    except Exception as e:
+        logger.error(f"Failed to import services: {e}")
+        raise
+    
+    try:
+        from app.models.schemas import (
+            PresentationRequest,
+            PresentationResponse,
+            ErrorResponse
+        )
+    except Exception as e:
+        logger.error(f"Failed to import schemas: {e}")
+        raise
+
+except Exception as e:
+    # If ANY import fails, we need to handle it gracefully
+    # But we can't import FastAPI if it failed above, so we need a different approach
+    import traceback
+    error_trace = traceback.format_exc()
+    logger.error(f"CRITICAL: Failed to import required modules: {e}\n{error_trace}")
+    
+    # Try to create minimal app anyway - if FastAPI import failed, this will fail too
+    # but at least we'll have better error messages
+    try:
+        from fastapi import FastAPI
+        from fastapi.responses import JSONResponse
+        app = FastAPI(title="Error", version="1.0.0")
+        
+        @app.get("/")
+        async def error_root():
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "Application failed to start",
+                    "detail": str(e),
+                    "type": type(e).__name__,
+                    "message": "Check Vercel logs for full traceback"
+                }
+            )
+    except Exception as import_error:
+        # If we can't even create a minimal app, we're in serious trouble
+        logger.error(f"CRITICAL: Cannot create minimal app: {import_error}")
+        # Create a dummy app object so handler can be created
+        class DummyApp:
+            pass
+        app = DummyApp()
+    
+    # Try to create handler anyway
+    handler = None
+    try:
+        from mangum import Mangum
+        handler = Mangum(app, lifespan="off")
+    except:
+        pass
+    
+    # Re-raise the original error so we know what failed
+    # But handler might still be None, which will cause issues
+    raise
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -369,18 +445,35 @@ async def generate_presentation(request: PresentationRequest):
 # REMOVED ALL @app.exception_handler decorators
 # The SafeExceptionMiddleware handles all exceptions before they reach FastAPI's handlers
 
-# Vercel serverless handler - must be at module level
+# Vercel serverless handler - MUST be at module level and always defined
+# This is critical - Vercel's @vercel/python looks for 'handler' variable
+# The handler must be a Mangum instance wrapping the FastAPI app
 try:
     from mangum import Mangum
     handler = Mangum(app, lifespan="off")  # Disable lifespan for serverless
-    print("✅ Mangum handler initialized for Vercel")
+    logger.info("✅ Mangum handler initialized for Vercel")
 except ImportError as e:
+    logger.error(f"CRITICAL: Mangum not available: {e}")
+    # Create a minimal Mangum-like wrapper
+    # Vercel requires handler to exist, so we create a basic one
+    from mangum import Mangum
+    # If we get here, Mangum should be installed, but just in case...
     handler = None
-    print(f"⚠️ Mangum not available (local dev mode): {e}")
-    # Mangum not installed, will work for local development
 except Exception as e:
+    logger.error(f"CRITICAL: Failed to initialize Mangum handler: {e}", exc_info=True)
     handler = None
-    print(f"⚠️ Failed to initialize Mangum: {e}")
+
+# CRITICAL: Handler MUST be defined for Vercel
+if handler is None:
+    logger.error("CRITICAL: Handler is None - attempting to create minimal handler")
+    try:
+        from mangum import Mangum
+        handler = Mangum(app, lifespan="off")
+        logger.info("✅ Created Mangum handler as fallback")
+    except Exception as e:
+        logger.error(f"CRITICAL: Cannot create handler: {e}", exc_info=True)
+        # Last resort - export app directly (Vercel might handle it)
+        handler = app
 
 # Serve React frontend (after building with: cd ppt-agent-frontend && npm run build)
 from fastapi.staticfiles import StaticFiles
