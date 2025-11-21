@@ -54,25 +54,29 @@ try:
     from googleapiclient.errors import HttpError
 
     # Import app modules - wrap in try-except to prevent crashes
+    # DO NOT re-raise - we need the app to start even if some imports fail
+    import_error = None
     try:
         from app.config import settings
     except Exception as e:
-        logger.error(f"Failed to import app.config: {e}")
-        raise
+        logger.error(f"Failed to import app.config: {e}", exc_info=True)
+        import_error = e
     
     try:
         from app.utils.auth import get_google_services
     except Exception as e:
-        logger.error(f"Failed to import app.utils.auth: {e}")
-        raise
+        logger.error(f"Failed to import app.utils.auth: {e}", exc_info=True)
+        if not import_error:
+            import_error = e
     
     try:
         from app.services.agent_service import AgentService
         from app.services.slides_service import SlidesService
         from app.services.drive_service import DriveService
     except Exception as e:
-        logger.error(f"Failed to import services: {e}")
-        raise
+        logger.error(f"Failed to import services: {e}", exc_info=True)
+        if not import_error:
+            import_error = e
     
     try:
         from app.models.schemas import (
@@ -81,8 +85,13 @@ try:
             ErrorResponse
         )
     except Exception as e:
-        logger.error(f"Failed to import schemas: {e}")
-        raise
+        logger.error(f"Failed to import schemas: {e}", exc_info=True)
+        if not import_error:
+            import_error = e
+
+    # If we had import errors, log them but continue
+    if import_error:
+        logger.warning(f"Some imports failed, but continuing: {import_error}")
 
 except Exception as e:
     # If ANY import fails, we need to handle it gracefully
@@ -125,9 +134,9 @@ except Exception as e:
     except:
         pass
     
-    # Re-raise the original error so we know what failed
-    # But handler might still be None, which will cause issues
-    raise
+    # DO NOT re-raise - we need handler to be defined
+    # Log the error but continue so handler can be created
+    logger.error(f"Import failed but continuing to create handler: {e}")
 
 # Initialize FastAPI app
 app = FastAPI(
