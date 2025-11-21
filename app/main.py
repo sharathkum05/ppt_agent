@@ -159,21 +159,36 @@ def initialize_services():
         
         # Initialize Agent service (requires Google services)
         agent_service = AgentService(slides_service, drive_service)
+        print("✅ Services initialized successfully")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to initialize services: {str(e)}"
-        )
+        error_msg = str(e)
+        error_type = type(e).__name__
+        print(f"❌ Failed to initialize services: {error_type}: {error_msg}")
+        # Re-raise with more context
+        raise ValueError(f"Service initialization failed: {error_type}: {error_msg}")
 
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize services on application startup"""
-    try:
-        initialize_services()
-    except Exception as e:
-        print(f"Warning: Could not initialize services on startup: {e}")
-        print("Services will be initialized on first request")
+    # Don't initialize on startup for serverless - initialize on first request instead
+    # This prevents cold start failures if env vars are missing
+    print("FastAPI app started. Services will be initialized on first request.")
+
+
+@app.get("/")
+async def root():
+    """Root endpoint - simple health check without initialization"""
+    return {
+        "status": "ok",
+        "message": "AI Google Slides Generator API",
+        "version": "2.0.0",
+        "endpoints": {
+            "health": "/health",
+            "generate": "/generate-presentation (POST)",
+            "debug": "/debug/env"
+        }
+    }
 
 
 @app.get("/health")
@@ -194,7 +209,8 @@ async def health_check():
                         "status": "unhealthy",
                         "error": error_msg,
                         "error_type": error_type,
-                        "message": "Failed to initialize services. Check environment variables."
+                        "message": "Failed to initialize services. Check environment variables.",
+                        "hint": "Visit /debug/env to check which environment variables are set"
                     }
                 )
         
@@ -205,7 +221,8 @@ async def health_check():
             content={
                 "status": "unhealthy",
                 "error": str(e),
-                "error_type": type(e).__name__
+                "error_type": type(e).__name__,
+                "hint": "Visit /debug/env to check which environment variables are set"
             }
         )
 
@@ -263,9 +280,12 @@ async def generate_presentation(request: PresentationRequest):
         try:
             initialize_services()
         except Exception as e:
+            error_msg = str(e)
+            error_type = type(e).__name__
+            print(f"❌ Service initialization error in endpoint: {error_type}: {error_msg}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Failed to initialize services: {str(e)}"
+                detail=f"Failed to initialize services: {error_msg}. Please check environment variables and Vercel logs."
             )
     
     # Use sys.exc_info() to safely check exception type without accessing the exception object
@@ -288,13 +308,18 @@ async def generate_presentation(request: PresentationRequest):
 # REMOVED ALL @app.exception_handler decorators
 # The SafeExceptionMiddleware handles all exceptions before they reach FastAPI's handlers
 
-# Vercel serverless handler
+# Vercel serverless handler - must be at module level
 try:
     from mangum import Mangum
     handler = Mangum(app, lifespan="off")  # Disable lifespan for serverless
-except ImportError:
+    print("✅ Mangum handler initialized for Vercel")
+except ImportError as e:
     handler = None
+    print(f"⚠️ Mangum not available (local dev mode): {e}")
     # Mangum not installed, will work for local development
+except Exception as e:
+    handler = None
+    print(f"⚠️ Failed to initialize Mangum: {e}")
 
 # Serve React frontend (after building with: cd ppt-agent-frontend && npm run build)
 from fastapi.staticfiles import StaticFiles
@@ -319,12 +344,14 @@ if os.path.exists(FRONTEND_BUILD_PATH):
     # Catch-all route for React Router (must be last, after all API routes)
     @app.get("/{full_path:path}", include_in_schema=False)
     async def catch_all(full_path: str):
-        # Don't catch API routes or static assets
-        if (full_path == "docs" or 
+        # Don't catch root, API routes, or static assets
+        if (full_path == "" or
+            full_path == "docs" or 
             full_path == "openapi.json" or
             full_path.startswith("api/") or 
             full_path.startswith("generate-presentation") or 
             full_path.startswith("health") or
+            full_path.startswith("debug") or
             full_path.startswith("test-exception") or
             full_path.startswith("assets/") or
             full_path.startswith("docs/") or
@@ -336,17 +363,6 @@ if os.path.exists(FRONTEND_BUILD_PATH):
             return FileResponse(FRONTEND_INDEX_PATH)
         return {"message": "Frontend not built"}
 else:
-    # Fallback root endpoint if frontend doesn't exist
-    @app.get("/")
-    async def root():
-        """Root endpoint"""
-        return {
-            "message": "AI Google Slides Generator API - Agent-based",
-            "version": "2.0.0",
-            "architecture": "AI Agent with tool calling",
-            "endpoints": {
-                "generate_presentation": "/generate-presentation (POST)"
-            },
-            "note": "Frontend not found. Run: cd ppt-agent-frontend && npm run build"
-        }
+    # Frontend build doesn't exist, root endpoint already defined above
+    pass
 
