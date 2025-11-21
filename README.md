@@ -1,38 +1,65 @@
-# 🎨 PPT Agent - AI-Powered Presentation Generator
+# PPT Agent - AI-Powered Presentation Generator
 
-Create stunning presentations with AI in seconds. Powered by Anthropic Claude and Google Slides API.
+An autonomous AI agent that automates repetitive PowerPoint editing tasks, creating and managing presentations through intelligent automation. Built with Anthropic Claude API and Google Slides.
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
-![Python](https://img.shields.io/badge/python-3.10+-green.svg)
-![React](https://img.shields.io/badge/react-18+-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/sharathkum05/ppt_agent)
+[![Python](https://img.shields.io/badge/python-3.10+-green.svg)](https://www.python.org/)
+[![React](https://img.shields.io/badge/react-18+-blue.svg)](https://react.dev/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-## ✨ Features
+## Overview
 
-- 🤖 **AI-Powered Content Generation**: Uses Anthropic Claude API with tool calling for intelligent presentation creation
-- 🎨 **Automatic Professional Design**: Beautiful slides with professional layouts automatically applied
-- ⚡ **Fast Generation**: Create presentations in seconds, not hours
-- 📊 **Customizable**: Specify topic, number of slides, and key points
-- 🔗 **Direct Google Slides Integration**: Presentations are created directly in Google Slides
-- 🚀 **Modern Web Interface**: Beautiful React frontend with shadcn/ui components
-- 🛠️ **Autonomous AI Agent**: Agent makes decisions and uses tools to create complete presentations
+PPT Agent eliminates the manual, repetitive work involved in creating and editing presentations. Instead of spending hours formatting slides, structuring content, and managing multiple iterations, the AI agent handles these tasks autonomously.
 
-## 🚀 Quick Start
+The agent intelligently:
+- Plans presentation structure based on your requirements
+- Creates and formats slides automatically
+- Manages content placement and styling
+- Handles multiple editing iterations
+- Finalizes and shares presentations
 
-### Prerequisites
+## Key Features
+
+- **Autonomous AI Agent**: Makes independent decisions and executes presentation creation workflows
+- **Tool Calling Architecture**: Uses Anthropic Claude's tool use API for structured operations
+- **Automated Content Generation**: Generates structured content based on natural language prompts
+- **Professional Layout Management**: Automatically applies consistent formatting and design
+- **Iterative Refinement**: Reviews and improves slides before finalization
+- **Google Slides Integration**: Direct creation and editing within Google Slides
+- **Modern Web Interface**: React-based frontend with TypeScript and Tailwind CSS
+
+## Technology Stack
+
+**Backend**
+- FastAPI - Modern async web framework
+- Anthropic Claude API - AI agent with tool calling
+- Google Slides API - Presentation creation and editing
+- Google Drive API - File management and sharing
+- Mangum - Serverless deployment adapter
+
+**Frontend**
+- React 19 with TypeScript
+- Vite - Build tool and dev server
+- shadcn/ui - UI component library
+- Tailwind CSS - Utility-first styling
+- Framer Motion - Animations
+
+## Prerequisites
 
 - Python 3.10 or higher
-- Node.js 18+ (for frontend)
+- Node.js 18+ (for frontend development)
 - Anthropic API key ([Get one here](https://console.anthropic.com/))
 - Google Cloud Project with Slides API and Drive API enabled
 - Google Service Account credentials (JSON file)
+
+## Quick Start
 
 ### Backend Setup
 
 1. **Clone the repository:**
 ```bash
-git clone https://github.com/yourusername/ppt-agent.git
-cd ppt-agent
+git clone https://github.com/sharathkum05/ppt_agent.git
+cd ppt_agent
 ```
 
 2. **Create virtual environment:**
@@ -41,32 +68,22 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. **Install Python dependencies:**
+3. **Install dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
 
-4. **Set up environment variables:**
+4. **Configure environment:**
 ```bash
 cp .env.example .env
 # Edit .env with your API keys and configuration
 ```
 
-Required environment variables:
-- `ANTHROPIC_API_KEY`: Your Anthropic API key
-- `GOOGLE_CREDENTIALS_PATH`: Path to your Google service account JSON file
-- `DEFAULT_PRESENTATION_ID`: Google Slides presentation ID to edit
-
 5. **Run the backend:**
 ```bash
-# Using the start script
 ./start_servers.sh
-
-# Or manually
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+# Or manually: uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
 ```
-
-The API will be available at `http://localhost:8001`
 
 ### Frontend Setup
 
@@ -80,10 +97,9 @@ cd ppt-agent-frontend
 npm install
 ```
 
-3. **Set up environment:**
+3. **Configure environment:**
 ```bash
 cp .env.example .env
-# Edit .env if needed (defaults to http://localhost:8001)
 ```
 
 4. **Run the frontend:**
@@ -91,96 +107,32 @@ cp .env.example .env
 npm run dev
 ```
 
-Visit `http://localhost:5173` to see the interface.
+Visit `http://localhost:5173` to access the interface.
 
-### Using the Start Scripts
+## Configuration
 
-For convenience, use the provided scripts:
+### Environment Variables
 
-```bash
-# Start both backend and frontend
-./start_servers.sh
+See `.env.example` for all configuration options:
 
-# Stop all servers
-./stop_servers.sh
-```
+**Required:**
+- `ANTHROPIC_API_KEY` - Your Anthropic API key
+- `GOOGLE_CREDENTIALS_PATH` - Path to Google service account JSON file
+- `DEFAULT_PRESENTATION_ID` - Google Slides presentation ID to edit
 
-## 📦 Deployment
+**Optional:**
+- `GOOGLE_DRIVE_FOLDER_ID` - Google Drive folder ID
+- `AGENT_MAX_ITERATIONS` - Maximum agent iterations (default: 20)
+- `AGENT_MODEL` - Anthropic model to use (default: claude-3-haiku-20240307)
+- `AGENT_ENABLE_REVIEW` - Enable agent review step (default: true)
 
-### Deploy to Vercel
-
-#### Backend Deployment
-
-1. **Install Vercel CLI:**
-```bash
-npm install -g vercel
-```
-
-2. **Login to Vercel:**
-```bash
-vercel login
-```
-
-3. **Deploy:**
-```bash
-vercel --prod
-```
-
-4. **Set environment variables in Vercel dashboard:**
-   - Go to your project settings
-   - Navigate to Environment Variables
-   - Add the following:
-     - `ANTHROPIC_API_KEY`: Your Anthropic API key
-     - `GOOGLE_CREDENTIALS_PATH`: Path to credentials (for serverless, you may need to base64 encode)
-     - `DEFAULT_PRESENTATION_ID`: Your Google Slides presentation ID
-     - `FRONTEND_URL`: Your frontend URL (for CORS)
-
-#### Frontend Deployment
-
-1. **Navigate to frontend:**
-```bash
-cd ppt-agent-frontend
-```
-
-2. **Update API URL:**
-Create `.env.production`:
-```env
-VITE_API_URL=https://your-backend-url.vercel.app
-```
-
-3. **Deploy:**
-```bash
-vercel --prod
-```
-
-For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md)
-
-## 🛠️ Tech Stack
-
-### Backend
-- **FastAPI**: Modern, fast web framework for building APIs
-- **Anthropic Claude API**: AI model for content generation with tool calling
-- **Google Slides API**: Create and edit presentations
-- **Google Drive API**: Manage file sharing and access
-- **Uvicorn**: ASGI server for FastAPI
-- **Mangum**: ASGI adapter for AWS Lambda/Vercel
-
-### Frontend
-- **React 19**: Modern UI library
-- **TypeScript**: Type-safe JavaScript
-- **Vite**: Fast build tool and dev server
-- **shadcn/ui**: Beautiful, accessible UI components
-- **Tailwind CSS**: Utility-first CSS framework
-- **Framer Motion**: Animation library
-- **Axios**: HTTP client
-
-## 📝 API Documentation
+## API Documentation
 
 ### Generate Presentation
 
 **Endpoint:** `POST /generate-presentation`
 
-**Request Body:**
+**Request:**
 ```json
 {
   "prompt": "Create a 5-slide presentation about renewable energy, covering solar, wind, hydro, benefits, and future outlook"
@@ -197,15 +149,6 @@ For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md)
 }
 ```
 
-**Error Response:**
-```json
-{
-  "error": "Error message",
-  "type": "ErrorType",
-  "detail": "Detailed error information"
-}
-```
-
 ### Health Check
 
 **Endpoint:** `GET /health`
@@ -219,16 +162,13 @@ For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md)
 }
 ```
 
-### API Documentation (Swagger)
+Interactive API documentation available at `http://localhost:8001/docs` when running locally.
 
-Visit `http://localhost:8001/docs` for interactive API documentation.
-
-## 🏗️ Project Structure
+## Project Structure
 
 ```
 ppt_agent/
 ├── app/
-│   ├── __init__.py
 │   ├── main.py                 # FastAPI application
 │   ├── config.py               # Configuration settings
 │   ├── agent/
@@ -247,36 +187,54 @@ ppt_agent/
 ├── ppt-agent-frontend/         # React frontend
 │   ├── src/
 │   │   ├── App.tsx             # Main React component
-│   │   ├── main.tsx            # React entry point
 │   │   ├── components/         # React components
-│   │   ├── services/           # API service layer
-│   │   └── lib/                # Utility functions
+│   │   └── services/           # API service layer
 │   └── package.json
 ├── credentials/                # Google credentials (not in repo)
 ├── .env.example                # Environment variables template
 ├── requirements.txt            # Python dependencies
-├── vercel.json                 # Vercel configuration
-├── start_servers.sh            # Start script
-├── stop_servers.sh             # Stop script
 └── README.md                   # This file
 ```
 
-## 🔧 Configuration
+## Deployment
 
-### Environment Variables
+### Deploy to Vercel
 
-See `.env.example` for all available configuration options:
+**Backend:**
+```bash
+vercel --prod
+```
 
-- `ANTHROPIC_API_KEY`: Required - Your Anthropic API key
-- `GOOGLE_CREDENTIALS_PATH`: Required - Path to Google service account JSON
-- `DEFAULT_PRESENTATION_ID`: Required - Google Slides presentation ID
-- `GOOGLE_DRIVE_FOLDER_ID`: Optional - Google Drive folder ID
-- `AGENT_MAX_ITERATIONS`: Optional - Maximum agent iterations (default: 20)
-- `AGENT_MODEL`: Optional - Anthropic model to use (default: claude-3-haiku-20240307)
+**Frontend:**
+```bash
+cd ppt-agent-frontend
+vercel --prod
+```
 
-## 🤝 Contributing
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+### Environment Variables for Vercel
+
+Configure these in your Vercel project settings:
+- `ANTHROPIC_API_KEY`
+- `GOOGLE_CREDENTIALS_JSON` (base64 encoded service account JSON)
+- `DEFAULT_PRESENTATION_ID`
+- `GOOGLE_DRIVE_FOLDER_ID`
+- `FRONTEND_URL` (set after frontend deployment)
+
+## How It Works
+
+1. **User Input**: Provide a natural language prompt describing the presentation
+2. **Agent Planning**: AI agent analyzes requirements and plans structure
+3. **Tool Execution**: Agent uses available tools (create_slide, add_content, format_slide)
+4. **Iterative Refinement**: Agent reviews and improves slides automatically
+5. **Finalization**: Agent finalizes presentation and generates shareable link
+
+The agent handles all repetitive tasks including formatting, content structuring, slide organization, and presentation management.
+
+## Contributing
+
+Contributions are welcome. Please feel free to submit a Pull Request.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
@@ -284,25 +242,21 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 👨‍💻 Author
+## Author
 
 **Sharath Kumar**
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [Anthropic Claude API](https://www.anthropic.com/) for AI capabilities
 - [Google Slides API](https://developers.google.com/slides) for presentation creation
-- [shadcn/ui](https://ui.shadcn.com/) for beautiful UI components
-- [FastAPI](https://fastapi.tiangolo.com/) for the excellent web framework
+- [shadcn/ui](https://ui.shadcn.com/) for UI components
+- [FastAPI](https://fastapi.tiangolo.com/) for the web framework
 
-## 📞 Support
+## Support
 
-If you encounter any issues or have questions, please open an issue on GitHub.
-
----
-
-Made with ❤️ using AI
+For issues or questions, please open an issue on [GitHub](https://github.com/sharathkum05/ppt_agent/issues).
