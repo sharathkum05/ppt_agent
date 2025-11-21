@@ -52,10 +52,23 @@ try:
     from fastapi.responses import JSONResponse
     from starlette.middleware.base import BaseHTTPMiddleware
     from googleapiclient.errors import HttpError
+    
+    # Store these for use later (in case we need them in except block)
+    _BaseHTTPMiddleware = BaseHTTPMiddleware
+    _Request = Request
 
     # Import app modules - wrap in try-except to prevent crashes
     # DO NOT re-raise - we need the app to start even if some imports fail
     import_error = None
+    settings = None
+    get_google_services = None
+    AgentService = None
+    SlidesService = None
+    DriveService = None
+    PresentationRequest = None
+    PresentationResponse = None
+    ErrorResponse = None
+    
     try:
         from app.config import settings
     except Exception as e:
@@ -186,10 +199,14 @@ except Exception as e:
 
 
 # CRITICAL: Safe Exception Middleware - catches ALL exceptions BEFORE FastAPI handlers
-class SafeExceptionMiddleware(BaseHTTPMiddleware):
-    """Middleware that catches all exceptions without touching the exception object"""
-    
-    async def dispatch(self, request: Request, call_next):
+# Only define middleware if BaseHTTPMiddleware was imported successfully
+SafeExceptionMiddleware = None
+try:
+    if _BaseHTTPMiddleware:
+        class SafeExceptionMiddleware(_BaseHTTPMiddleware):
+            """Middleware that catches all exceptions without touching the exception object"""
+            
+            async def dispatch(self, request, call_next):
         print("="*50)
         print("MIDDLEWARE STARTED")
         print(f"Request: {request.method} {request.url.path}")
@@ -257,10 +274,21 @@ class SafeExceptionMiddleware(BaseHTTPMiddleware):
                     "detail": None
                 }
             )
-
+except NameError:
+    # BaseHTTPMiddleware not available, skip middleware
+    SafeExceptionMiddleware = None
+    logger.warning("Skipping middleware - BaseHTTPMiddleware not available")
+except Exception as e:
+    SafeExceptionMiddleware = None
+    logger.warning(f"Skipping middleware due to error: {e}")
 
 # Add middleware FIRST - before any routes or handlers
-app.add_middleware(SafeExceptionMiddleware)
+# Only add if middleware was defined
+if SafeExceptionMiddleware:
+    try:
+        app.add_middleware(SafeExceptionMiddleware)
+    except Exception as e:
+        logger.warning(f"Failed to add middleware: {e}")
 
 # Initialize services (will be initialized on first request)
 agent_service = None
@@ -439,8 +467,8 @@ async def debug_env():
     
     return env_status
 
-@app.post("/generate-presentation", response_model=PresentationResponse)
-async def generate_presentation(request: PresentationRequest):
+@app.post("/generate-presentation")
+async def generate_presentation(request_data: dict):
     """
     Generate a Google Slides presentation from a prompt using AI Agent
     
@@ -452,14 +480,21 @@ async def generate_presentation(request: PresentationRequest):
     5. Finalize and share the presentation
     
     Args:
-        request: PresentationRequest with user prompt
+        request_data: Dict with 'prompt' key
         
     Returns:
-        PresentationResponse with presentation ID, shareable link, title, and slide count
+        Dict with presentation ID, shareable link, title, and slide count
         
     Raises:
         HTTPException: If any step fails
     """
+    # Check if required services are available
+    if AgentService is None or SlidesService is None or DriveService is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Services not initialized. Check Vercel logs for import errors."
+        )
+    
     # Initialize services if not already done
     if agent_service is None or slides_service is None or drive_service is None:
         try:
@@ -477,17 +512,30 @@ async def generate_presentation(request: PresentationRequest):
     import sys
     import traceback
     
+    # Extract prompt from request
+    prompt = request_data.get("prompt", "")
+    if not prompt:
+        raise HTTPException(status_code=400, detail="Missing 'prompt' in request body")
+    
     # Use AI Agent to generate presentation
     # Let all exceptions propagate to FastAPI exception handlers
-    result = agent_service.generate_presentation(request.prompt)
+    result = agent_service.generate_presentation(prompt)
     
-    # Return response
-    return PresentationResponse(
-        presentation_id=result["presentation_id"],
-        shareable_link=result["shareable_link"],
-        title=result["title"],
-        slide_count=result["slide_count"]
-    )
+    # Return response (as dict if PresentationResponse not available)
+    if PresentationResponse:
+        return PresentationResponse(
+            presentation_id=result["presentation_id"],
+            shareable_link=result["shareable_link"],
+            title=result["title"],
+            slide_count=result["slide_count"]
+        )
+    else:
+        return {
+            "presentation_id": result["presentation_id"],
+            "shareable_link": result["shareable_link"],
+            "title": result["title"],
+            "slide_count": result["slide_count"]
+        }
 
 
 # REMOVED ALL @app.exception_handler decorators
