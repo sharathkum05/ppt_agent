@@ -240,18 +240,18 @@ except Exception as e:
             logger.error("❌ CRITICAL: Handler is None! Using emergency handler")
         handler = emergency_handler
 
-    print("=" * 60, file=sys.stderr)
-    print("Application startup complete!", file=sys.stderr)
-    print(f"Handler type: {type(handler)}", file=sys.stderr)
-    print(f"App type: {type(app) if app else 'None'}", file=sys.stderr)
-    print("=" * 60, file=sys.stderr)
+print("=" * 60, file=sys.stderr)
+print("Application startup complete!", file=sys.stderr)
+print(f"Handler type: {type(handler)}", file=sys.stderr)
+print(f"App type: {type(app) if app else 'None'}", file=sys.stderr)
+print("=" * 60, file=sys.stderr)
 
-    if logger:
-        logger.info("=" * 60)
-        logger.info("Application startup complete!")
-        logger.info(f"Handler type: {type(handler)}")
-        logger.info(f"App type: {type(app) if app else 'None'}")
-        logger.info("=" * 60)
+if logger:
+    logger.info("=" * 60)
+    logger.info("Application startup complete!")
+    logger.info(f"Handler type: {type(handler)}")
+    logger.info(f"App type: {type(app) if app else 'None'}")
+    logger.info("=" * 60)
 
 except Exception as e:
     # CRITICAL: If ANYTHING fails at module level, we MUST still have a handler
