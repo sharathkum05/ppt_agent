@@ -51,10 +51,35 @@ class Settings:
         if not self.ANTHROPIC_API_KEY:
             raise ValueError("ANTHROPIC_API_KEY environment variable is required")
         
-        if not self.google_credentials_path.exists():
-            raise FileNotFoundError(
-                f"Google credentials file not found at: {self.google_credentials_path}"
-            )
+        # Check if using environment variables (for Vercel/serverless)
+        # If project_id or GOOGLE_PROJECT_ID is set, we're using env vars
+        if os.getenv("GOOGLE_PROJECT_ID") or os.getenv("project_id"):
+            # Validate required Google env vars are present
+            required_google_vars = [
+                "GOOGLE_PROJECT_ID", "project_id",
+                "GOOGLE_PRIVATE_KEY", "private_key",
+                "GOOGLE_CLIENT_EMAIL", "client_email",
+                "GOOGLE_TOKEN_URI", "token_uri"
+            ]
+            has_required = False
+            for var in required_google_vars:
+                if os.getenv(var):
+                    has_required = True
+                    break
+            
+            if not has_required:
+                raise ValueError(
+                    "Google credentials environment variables not found. "
+                    "Either set GOOGLE_PROJECT_ID (or project_id) and related vars, "
+                    "or provide a credentials file."
+                )
+        else:
+            # Using file-based credentials (local development)
+            if not self.google_credentials_path.exists():
+                raise FileNotFoundError(
+                    f"Google credentials file not found at: {self.google_credentials_path}. "
+                    "Either provide a file or set Google credentials as environment variables."
+                )
 
 
 # Global settings instance

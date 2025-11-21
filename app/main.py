@@ -182,13 +182,31 @@ async def health_check():
     try:
         # Check if services are initialized
         if agent_service is None or slides_service is None or drive_service is None:
-            initialize_services()
+            try:
+                initialize_services()
+            except Exception as init_error:
+                # Return detailed error for debugging
+                error_msg = str(init_error)
+                error_type = type(init_error).__name__
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "status": "unhealthy",
+                        "error": error_msg,
+                        "error_type": error_type,
+                        "message": "Failed to initialize services. Check environment variables."
+                    }
+                )
         
         return {"status": "healthy", "services": "initialized", "agent": "ready"}
     except Exception as e:
         return JSONResponse(
             status_code=503,
-            content={"status": "unhealthy", "error": str(e)}
+            content={
+                "status": "unhealthy",
+                "error": str(e),
+                "error_type": type(e).__name__
+            }
         )
 
 
@@ -197,6 +215,27 @@ async def test_exception():
     """Test endpoint to verify middleware is working"""
     print("ENDPOINT CALLED: /test-exception")
     raise ValueError("TEST EXCEPTION")
+
+
+@app.get("/debug/env")
+async def debug_env():
+    """Debug endpoint to check environment variables (without exposing sensitive data)"""
+    import os
+    env_vars = {
+        "ANTHROPIC_API_KEY": "SET" if os.getenv("ANTHROPIC_API_KEY") else "MISSING",
+        "GOOGLE_PROJECT_ID": "SET" if os.getenv("GOOGLE_PROJECT_ID") else "MISSING",
+        "project_id": "SET" if os.getenv("project_id") else "MISSING",
+        "GOOGLE_PRIVATE_KEY": "SET" if os.getenv("GOOGLE_PRIVATE_KEY") else "MISSING",
+        "private_key": "SET" if os.getenv("private_key") else "MISSING",
+        "GOOGLE_CLIENT_EMAIL": "SET" if os.getenv("GOOGLE_CLIENT_EMAIL") else "MISSING",
+        "client_email": "SET" if os.getenv("client_email") else "MISSING",
+        "GOOGLE_TOKEN_URI": "SET" if os.getenv("GOOGLE_TOKEN_URI") else "MISSING",
+        "token_uri": "SET" if os.getenv("token_uri") else "MISSING",
+        "DEFAULT_PRESENTATION_ID": os.getenv("DEFAULT_PRESENTATION_ID", "MISSING"),
+        "GOOGLE_DRIVE_FOLDER_ID": os.getenv("GOOGLE_DRIVE_FOLDER_ID", "MISSING"),
+        "AGENT_MODEL": os.getenv("AGENT_MODEL", "MISSING"),
+    }
+    return {"environment_variables": env_vars}
 
 @app.post("/generate-presentation", response_model=PresentationResponse)
 async def generate_presentation(request: PresentationRequest):

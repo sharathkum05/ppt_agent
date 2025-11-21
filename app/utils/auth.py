@@ -25,7 +25,12 @@ def get_google_credentials():
     # Try to load from environment variables first (for Vercel/serverless)
     if os.getenv("GOOGLE_PROJECT_ID") or os.getenv("project_id"):
         # Build credentials dict from environment variables
-        creds_dict = _build_credentials_from_env()
+        try:
+            creds_dict = _build_credentials_from_env()
+        except ValueError as e:
+            # Re-raise ValueError with clearer message
+            raise ValueError(f"Missing Google credentials environment variables: {str(e)}")
+        
         try:
             credentials = service_account.Credentials.from_service_account_info(
                 creds_dict,
@@ -33,7 +38,14 @@ def get_google_credentials():
             )
             return credentials
         except Exception as e:
-            raise ValueError(f"Failed to load Google credentials from env vars: {str(e)}")
+            error_msg = str(e)
+            # Provide more helpful error message
+            if "private_key" in error_msg.lower():
+                raise ValueError(
+                    f"Invalid private key format. Make sure it includes BEGIN/END markers and newlines. "
+                    f"Original error: {error_msg}"
+                )
+            raise ValueError(f"Failed to load Google credentials from env vars: {error_msg}")
     
     # Fall back to file path (for local development)
     creds_path = settings.google_credentials_path
