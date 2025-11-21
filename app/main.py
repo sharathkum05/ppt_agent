@@ -173,13 +173,16 @@ except Exception as e:
         class MinimalApp:
             pass
         app = MinimalApp()
-
-# Initialize FastAPI app
-app = FastAPI(
-    title="AI Google Slides Generator",
-    description="AI Agent that generates Google Slides presentations using Anthropic Claude with tool calling",
-    version="2.0.0"
-)
+    
+    # Try to create handler anyway
+    handler = None
+    try:
+        from mangum import Mangum
+        handler = Mangum(app, lifespan="off")
+        print("✅ Created error handler", file=sys.stderr)
+    except Exception as handler_error:
+        print(f"CRITICAL: Cannot create handler: {handler_error}", file=sys.stderr)
+        handler = None
 
 
 # CRITICAL: Safe Exception Middleware - catches ALL exceptions BEFORE FastAPI handlers
