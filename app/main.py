@@ -19,23 +19,24 @@ logger = logging.getLogger(__name__)
 # Initialize app and handler as None - will be set below
 app = None
 handler = None
-FastAPI = None
-JSONResponse = None
+FastAPI_available = False
 
 # Step 1: Import FastAPI (most critical) - NEVER exit, always create handler
 try:
     from fastapi import FastAPI
     from fastapi.responses import JSONResponse
+    FastAPI_available = True
     print("✅ FastAPI imported successfully", file=sys.stderr)
     logger.info("✅ FastAPI imported successfully")
 except Exception as e:
+    FastAPI_available = False
     print(f"❌ Failed to import FastAPI: {e}", file=sys.stderr)
     print(traceback.format_exc(), file=sys.stderr)
     logger.error(f"❌ Failed to import FastAPI: {e}", exc_info=True)
     # Don't exit - will create minimal handler
 
 # Step 2: Create app - NEVER exit, always create handler
-if FastAPI:
+if FastAPI_available:
     try:
         app = FastAPI(
             title="AI Google Slides Generator",
