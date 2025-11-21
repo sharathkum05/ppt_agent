@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 # Initialize app and handler as None - will be set below
 app = None
 handler = None
+FastAPI = None
+JSONResponse = None
 
 # Step 1: Import FastAPI (most critical) - NEVER exit, always create handler
 try:
@@ -30,11 +32,11 @@ except Exception as e:
     print(f"❌ Failed to import FastAPI: {e}", file=sys.stderr)
     print(traceback.format_exc(), file=sys.stderr)
     logger.error(f"❌ Failed to import FastAPI: {e}", exc_info=True)
-    # Don't exit - create minimal handler instead
+    # Don't exit - will create minimal handler
 
 # Step 2: Create app - NEVER exit, always create handler
-try:
-    if FastAPI:
+if FastAPI:
+    try:
         app = FastAPI(
             title="AI Google Slides Generator",
             description="AI Agent that generates Google Slides presentations",
@@ -42,11 +44,14 @@ try:
         )
         print("✅ FastAPI app created", file=sys.stderr)
         logger.info("✅ FastAPI app created")
-except Exception as e:
-    print(f"❌ Failed to create FastAPI app: {e}", file=sys.stderr)
-    print(traceback.format_exc(), file=sys.stderr)
-    logger.error(f"❌ Failed to create FastAPI app: {e}", exc_info=True)
-    # Don't exit - will create minimal handler
+    except Exception as e:
+        print(f"❌ Failed to create FastAPI app: {e}", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
+        logger.error(f"❌ Failed to create FastAPI app: {e}", exc_info=True)
+        # Don't exit - will create minimal handler
+else:
+    print("⚠️ FastAPI not available, will create minimal handler", file=sys.stderr)
+    logger.warning("⚠️ FastAPI not available, will create minimal handler")
 
 # Step 3: Add basic routes (no dependencies on other modules)
 # Only add routes if app was created successfully
