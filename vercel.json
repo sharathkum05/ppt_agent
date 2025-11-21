@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "app/main.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "app/main.py"
+    },
+    {
+      "src": "/generate-presentation",
+      "dest": "app/main.py"
+    },
+    {
+      "src": "/health",
+      "dest": "app/main.py"
+    },
+    {
+      "src": "/debug/(.*)",
+      "dest": "app/main.py"
+    },
+    {
+      "src": "/docs",
+      "dest": "app/main.py"
+    },
+    {
+      "src": "/openapi.json",
+      "dest": "app/main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "app/main.py"
+    }
+  ],
+  "env": {
+    "PYTHONPATH": "."
+  }
+}
+
