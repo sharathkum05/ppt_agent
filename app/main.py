@@ -50,75 +50,81 @@ except Exception as e:
     pass
 
     # Step 1: Import FastAPI (most critical) - NEVER exit, always create handler
-    try:
-        from fastapi import FastAPI
-        from fastapi.responses import JSONResponse
-        FastAPI_available = True
-        if logger:
-            logger.info("✅ FastAPI imported successfully")
-        print("✅ FastAPI imported successfully", file=sys.stderr)
-    except Exception as e:
-        FastAPI_available = False
-        print(f"❌ Failed to import FastAPI: {e}", file=sys.stderr)
-        print(traceback.format_exc(), file=sys.stderr)
-        if logger:
-            logger.error(f"❌ Failed to import FastAPI: {e}", exc_info=True)
+try:
+    from fastapi import FastAPI
+    from fastapi.responses import JSONResponse
+    FastAPI_available = True
+    if logger:
+        logger.info("✅ FastAPI imported successfully")
+    print("✅ FastAPI imported successfully", file=sys.stderr)
+except Exception as e:
+    FastAPI_available = False
+    print(f"❌ Failed to import FastAPI: {e}", file=sys.stderr)
+    print(traceback.format_exc(), file=sys.stderr)
+    if logger:
+        logger.error(f"❌ Failed to import FastAPI: {e}", exc_info=True)
         # Don't exit - handler already defined
 
     # Step 2: Create app - NEVER exit, always create handler
-    if FastAPI_available:
-        try:
-            app = FastAPI(
-                title="AI Google Slides Generator",
-                description="AI Agent that generates Google Slides presentations",
-                version="2.0.0"
-            )
-            print("✅ FastAPI app created", file=sys.stderr)
-            if logger:
-                logger.info("✅ FastAPI app created")
-        except Exception as e:
-            print(f"❌ Failed to create FastAPI app: {e}", file=sys.stderr)
-            print(traceback.format_exc(), file=sys.stderr)
-            if logger:
-                logger.error(f"❌ Failed to create FastAPI app: {e}", exc_info=True)
-            # Don't exit - handler already defined
-    else:
-        print("⚠️ FastAPI not available, will use minimal handler", file=sys.stderr)
+if FastAPI_available:
+    try:
+        app = FastAPI(
+            title="AI Google Slides Generator",
+            description="AI Agent that generates Google Slides presentations",
+            version="2.0.0"
+        )
+        print("✅ FastAPI app created", file=sys.stderr)
         if logger:
+            logger.info("✅ FastAPI app created")
+    except Exception as e:
+        print(f"❌ Failed to create FastAPI app: {e}", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
+        if logger:
+            logger.error(f"❌ Failed to create FastAPI app: {e}", exc_info=True)
+        # Create a minimal FastAPI app as fallback (required for uvicorn)
+        try:
+            app = FastAPI(title="PPT Agent (Minimal Mode)", version="1.0.0")
+            print("✅ Created minimal FastAPI app as fallback", file=sys.stderr)
+        except Exception:
+            # If even minimal app fails, app will be None (handled below)
+            pass
+else:
+    print("⚠️ FastAPI not available, will use minimal handler", file=sys.stderr)
+    if logger:
             logger.warning("⚠️ FastAPI not available, will use minimal handler")
 
     # Step 3: Add basic routes (no dependencies on other modules)
-    # Only add routes if app was created successfully
-    if app:
-        try:
-            @app.get("/")
-            async def root():
-                """Root endpoint"""
-                return {
-                    "status": "ok",
-                    "message": "AI Google Slides Generator API",
-                    "version": "2.0.0"
-                }
+# Only add routes if app was created successfully
+if app:
+    try:
+        @app.get("/")
+        async def root():
+            """Root endpoint"""
+            return {
+                "status": "ok",
+                "message": "AI Google Slides Generator API",
+                "version": "2.0.0"
+            }
 
-            @app.get("/health")
-            async def health():
-                """Health check"""
-                return {"status": "healthy"}
-            
-            print("✅ Basic routes added", file=sys.stderr)
-            if logger:
-                logger.info("✅ Basic routes added")
-        except Exception as e:
-            print(f"⚠️ Failed to add basic routes: {e}", file=sys.stderr)
-            if logger:
-                logger.warning(f"⚠️ Failed to add basic routes: {e}")
-    else:
-        print("⚠️ App not created, skipping routes", file=sys.stderr)
+        @app.get("/health")
+        async def health():
+            """Health check"""
+            return {"status": "healthy"}
+        
+        print("✅ Basic routes added", file=sys.stderr)
         if logger:
+            logger.info("✅ Basic routes added")
+    except Exception as e:
+        print(f"⚠️ Failed to add basic routes: {e}", file=sys.stderr)
+        if logger:
+            logger.warning(f"⚠️ Failed to add basic routes: {e}")
+else:
+    print("⚠️ App not created, skipping routes", file=sys.stderr)
+    if logger:
             logger.warning("⚠️ App not created, skipping routes")
 
     # Step 4: Try to import and add full functionality (only if app exists)
-    if app:
+if app:
         try:
             from fastapi import HTTPException
             from app.config import settings
@@ -201,29 +207,29 @@ except Exception as e:
                 logger.warning(f"⚠️ Could not import full functionality: {e}")
                 logger.warning("⚠️ App will run in basic mode (root and health endpoints only)")
             # App still works with basic routes
-    else:
-        print("⚠️ App not available, skipping full functionality", file=sys.stderr)
-        if logger:
+else:
+    print("⚠️ App not available, skipping full functionality", file=sys.stderr)
+    if logger:
             logger.warning("⚠️ App not available, skipping full functionality")
 
     # Step 5: Create handler (CRITICAL for Vercel) - ALWAYS create handler
-    try:
-        from mangum import Mangum
-        if app:
-            handler = Mangum(app, lifespan="off")
-            print("✅ Mangum handler created successfully", file=sys.stderr)
-            if logger:
-                logger.info("✅ Mangum handler created successfully")
-        else:
-            # App is None, create minimal handler
-            print("⚠️ App is None, using minimal handler", file=sys.stderr)
-            async def minimal_handler(scope, receive, send):
-                from starlette.responses import JSONResponse
-                response = JSONResponse({"error": "FastAPI app not initialized"}, status_code=500)
-                await response(scope, receive, send)
-            handler = minimal_handler
-            print("✅ Minimal handler created", file=sys.stderr)
-    except Exception as e:
+try:
+    from mangum import Mangum
+    if app:
+        handler = Mangum(app, lifespan="off")
+        print("✅ Mangum handler created successfully", file=sys.stderr)
+        if logger:
+            logger.info("✅ Mangum handler created successfully")
+    else:
+        # App is None, create minimal handler
+        print("⚠️ App is None, using minimal handler", file=sys.stderr)
+        async def minimal_handler(scope, receive, send):
+            from starlette.responses import JSONResponse
+            response = JSONResponse({"error": "FastAPI app not initialized"}, status_code=500)
+            await response(scope, receive, send)
+        handler = minimal_handler
+        print("✅ Minimal handler created", file=sys.stderr)
+except Exception as e:
         print(f"❌ Failed to create Mangum handler: {e}", file=sys.stderr)
         print(traceback.format_exc(), file=sys.stderr)
         if logger:
@@ -233,6 +239,21 @@ except Exception as e:
         if logger:
             logger.warning("⚠️ Using emergency handler")
 
+    # Final check - ALWAYS ensure app exists (required for uvicorn when running locally)
+    if app is None and FastAPI_available:
+        print("⚠️ App is None but FastAPI is available, creating minimal app", file=sys.stderr)
+        try:
+            app = FastAPI(title="PPT Agent (Fallback Mode)", version="1.0.0")
+            @app.get("/")
+            async def root_fallback():
+                return {"error": "Application initialization failed", "status": "error"}
+            @app.get("/health")
+            async def health_fallback():
+                return {"status": "error", "message": "Initialization failed"}
+            print("✅ Created fallback FastAPI app", file=sys.stderr)
+        except Exception as e:
+            print(f"❌ Failed to create fallback app: {e}", file=sys.stderr)
+
     # Final check - ALWAYS ensure handler exists (should never be None, but double-check)
     if handler is None:
         print("❌ CRITICAL: Handler is None! Using emergency handler", file=sys.stderr)
@@ -240,18 +261,18 @@ except Exception as e:
             logger.error("❌ CRITICAL: Handler is None! Using emergency handler")
         handler = emergency_handler
 
-print("=" * 60, file=sys.stderr)
-print("Application startup complete!", file=sys.stderr)
-print(f"Handler type: {type(handler)}", file=sys.stderr)
-print(f"App type: {type(app) if app else 'None'}", file=sys.stderr)
-print("=" * 60, file=sys.stderr)
+    print("=" * 60, file=sys.stderr)
+    print("Application startup complete!", file=sys.stderr)
+    print(f"Handler type: {type(handler)}", file=sys.stderr)
+    print(f"App type: {type(app) if app else 'None'}", file=sys.stderr)
+    print("=" * 60, file=sys.stderr)
 
-if logger:
-    logger.info("=" * 60)
-    logger.info("Application startup complete!")
-    logger.info(f"Handler type: {type(handler)}")
-    logger.info(f"App type: {type(app) if app else 'None'}")
-    logger.info("=" * 60)
+    if logger:
+        logger.info("=" * 60)
+        logger.info("Application startup complete!")
+        logger.info(f"Handler type: {type(handler)}")
+        logger.info(f"App type: {type(app) if app else 'None'}")
+        logger.info("=" * 60)
 
 except Exception as e:
     # CRITICAL: If ANYTHING fails at module level, we MUST still have a handler

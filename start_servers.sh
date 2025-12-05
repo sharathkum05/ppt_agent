@@ -28,6 +28,13 @@ echo "✅ Frontend built successfully"
 # Start backend
 echo "🔧 Starting FastAPI backend on port 8001..."
 cd "$PROJECT_DIR"
+
+# Activate virtual environment if it exists
+if [ -d "venv" ]; then
+    source venv/bin/activate
+    echo "✅ Virtual environment activated"
+fi
+
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload > /tmp/ppt_agent_server.log 2>&1 &
 BACKEND_PID=$!
 echo $BACKEND_PID > /tmp/ppt_agent_server.pid
