@@ -49,7 +49,7 @@ except Exception as e:
     # If logging fails, at least handler is defined
     pass
 
-    # Step 1: Import FastAPI (most critical) - NEVER exit, always create handler
+# Step 1: Import FastAPI (most critical) - NEVER exit, always create handler
 try:
     from fastapi import FastAPI
     from fastapi.responses import JSONResponse
@@ -65,7 +65,7 @@ except Exception as e:
         logger.error(f"❌ Failed to import FastAPI: {e}", exc_info=True)
         # Don't exit - handler already defined
 
-    # Step 2: Create app - NEVER exit, always create handler
+# Step 2: Create app - NEVER exit, always create handler
 if FastAPI_available:
     try:
         app = FastAPI(
@@ -91,9 +91,9 @@ if FastAPI_available:
 else:
     print("⚠️ FastAPI not available, will use minimal handler", file=sys.stderr)
     if logger:
-            logger.warning("⚠️ FastAPI not available, will use minimal handler")
+        logger.warning("⚠️ FastAPI not available, will use minimal handler")
 
-    # Step 3: Add basic routes (no dependencies on other modules)
+# Step 3: Add basic routes (no dependencies on other modules)
 # Only add routes if app was created successfully
 if app:
     try:
@@ -121,98 +121,98 @@ if app:
 else:
     print("⚠️ App not created, skipping routes", file=sys.stderr)
     if logger:
-            logger.warning("⚠️ App not created, skipping routes")
+        logger.warning("⚠️ App not created, skipping routes")
 
-    # Step 4: Try to import and add full functionality (only if app exists)
+# Step 4: Try to import and add full functionality (only if app exists)
 if app:
-        try:
-            from fastapi import HTTPException
-            from app.config import settings
-            from app.utils.auth import get_google_services
-            from app.services.agent_service import AgentService
-            from app.services.slides_service import SlidesService
-            from app.services.drive_service import DriveService
-            from app.models.schemas import PresentationRequest, PresentationResponse
-            
-            # Initialize services (will be done on first request)
-            agent_service = None
-            slides_service = None
-            drive_service = None
-            
-            def initialize_services():
-                """Initialize Google and Agent services"""
-                global agent_service, slides_service, drive_service
+    try:
+        from fastapi import HTTPException
+        from app.config import settings
+        from app.utils.auth import get_google_services
+        from app.services.agent_service import AgentService
+        from app.services.slides_service import SlidesService
+        from app.services.drive_service import DriveService
+        from app.models.schemas import PresentationRequest, PresentationResponse
+        
+        # Initialize services (will be done on first request)
+        agent_service = None
+        slides_service = None
+        drive_service = None
+        
+        def initialize_services():
+            """Initialize Google and Agent services"""
+            global agent_service, slides_service, drive_service
+            try:
+                settings.validate()
+                slides_api, drive_api = get_google_services()
+                slides_service = SlidesService(slides_api)
+                drive_service = DriveService(drive_api)
+                agent_service = AgentService(slides_service, drive_service)
+                if logger:
+                    logger.info("✅ Services initialized successfully")
+            except Exception as e:
+                if logger:
+                    logger.error(f"❌ Failed to initialize services: {e}", exc_info=True)
+                raise
+        
+        @app.post("/generate-presentation")
+        async def generate_presentation(request: PresentationRequest):
+            """Generate a Google Slides presentation"""
+            if agent_service is None or slides_service is None or drive_service is None:
                 try:
-                    settings.validate()
-                    slides_api, drive_api = get_google_services()
-                    slides_service = SlidesService(slides_api)
-                    drive_service = DriveService(drive_api)
-                    agent_service = AgentService(slides_service, drive_service)
-                    if logger:
-                        logger.info("✅ Services initialized successfully")
+                    initialize_services()
                 except Exception as e:
-                    if logger:
-                        logger.error(f"❌ Failed to initialize services: {e}", exc_info=True)
-                    raise
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Failed to initialize services: {str(e)}"
+                    )
             
-            @app.post("/generate-presentation")
-            async def generate_presentation(request: PresentationRequest):
-                """Generate a Google Slides presentation"""
-                if agent_service is None or slides_service is None or drive_service is None:
-                    try:
-                        initialize_services()
-                    except Exception as e:
-                        raise HTTPException(
-                            status_code=500,
-                            detail=f"Failed to initialize services: {str(e)}"
-                        )
-                
-                result = agent_service.generate_presentation(request.prompt)
-                return PresentationResponse(
-                    presentation_id=result["presentation_id"],
-                    shareable_link=result["shareable_link"],
-                    title=result["title"],
-                    slide_count=result["slide_count"]
-                )
-            
-            @app.get("/debug/env")
-            async def debug_env():
-                """Debug endpoint to check environment variables"""
-                import os
-                env_status = {
-                    "anthropic": {
-                        "ANTHROPIC_API_KEY": "SET" if os.getenv("ANTHROPIC_API_KEY") else "MISSING",
-                    },
-                    "google_credentials": {
-                        "project_id": "SET" if (os.getenv("GOOGLE_PROJECT_ID") or os.getenv("project_id")) else "MISSING",
-                        "private_key": "SET" if (os.getenv("GOOGLE_PRIVATE_KEY") or os.getenv("private_key")) else "MISSING",
-                        "client_email": "SET" if (os.getenv("GOOGLE_CLIENT_EMAIL") or os.getenv("client_email")) else "MISSING",
-                        "token_uri": "SET" if (os.getenv("GOOGLE_TOKEN_URI") or os.getenv("token_uri")) else "MISSING",
-                    },
-                    "application": {
-                        "DEFAULT_PRESENTATION_ID": os.getenv("DEFAULT_PRESENTATION_ID", "MISSING"),
-                        "GOOGLE_DRIVE_FOLDER_ID": os.getenv("GOOGLE_DRIVE_FOLDER_ID", "MISSING"),
-                    }
+            result = agent_service.generate_presentation(request.prompt)
+            return PresentationResponse(
+                presentation_id=result["presentation_id"],
+                shareable_link=result["shareable_link"],
+                title=result["title"],
+                slide_count=result["slide_count"]
+            )
+        
+        @app.get("/debug/env")
+        async def debug_env():
+            """Debug endpoint to check environment variables"""
+            import os
+            env_status = {
+                "anthropic": {
+                    "ANTHROPIC_API_KEY": "SET" if os.getenv("ANTHROPIC_API_KEY") else "MISSING",
+                },
+                "google_credentials": {
+                    "project_id": "SET" if (os.getenv("GOOGLE_PROJECT_ID") or os.getenv("project_id")) else "MISSING",
+                    "private_key": "SET" if (os.getenv("GOOGLE_PRIVATE_KEY") or os.getenv("private_key")) else "MISSING",
+                    "client_email": "SET" if (os.getenv("GOOGLE_CLIENT_EMAIL") or os.getenv("client_email")) else "MISSING",
+                    "token_uri": "SET" if (os.getenv("GOOGLE_TOKEN_URI") or os.getenv("token_uri")) else "MISSING",
+                },
+                "application": {
+                    "DEFAULT_PRESENTATION_ID": os.getenv("DEFAULT_PRESENTATION_ID", "MISSING"),
+                    "GOOGLE_DRIVE_FOLDER_ID": os.getenv("GOOGLE_DRIVE_FOLDER_ID", "MISSING"),
                 }
-                return env_status
-            
-            print("✅ Full functionality imported and routes added", file=sys.stderr)
-            if logger:
-                logger.info("✅ Full functionality imported and routes added")
-            
-        except Exception as e:
-            print(f"⚠️ Could not import full functionality: {e}", file=sys.stderr)
-            print(traceback.format_exc(), file=sys.stderr)
-            if logger:
-                logger.warning(f"⚠️ Could not import full functionality: {e}")
-                logger.warning("⚠️ App will run in basic mode (root and health endpoints only)")
-            # App still works with basic routes
+            }
+            return env_status
+        
+        print("✅ Full functionality imported and routes added", file=sys.stderr)
+        if logger:
+            logger.info("✅ Full functionality imported and routes added")
+        
+    except Exception as e:
+        print(f"⚠️ Could not import full functionality: {e}", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
+        if logger:
+            logger.warning(f"⚠️ Could not import full functionality: {e}")
+            logger.warning("⚠️ App will run in basic mode (root and health endpoints only)")
+        # App still works with basic routes
 else:
     print("⚠️ App not available, skipping full functionality", file=sys.stderr)
     if logger:
-            logger.warning("⚠️ App not available, skipping full functionality")
+        logger.warning("⚠️ App not available, skipping full functionality")
 
-    # Step 5: Create handler (CRITICAL for Vercel) - ALWAYS create handler
+# Step 5: Create handler (CRITICAL for Vercel) - ALWAYS create handler
 try:
     from mangum import Mangum
     if app:
@@ -230,58 +230,46 @@ try:
         handler = minimal_handler
         print("✅ Minimal handler created", file=sys.stderr)
 except Exception as e:
-        print(f"❌ Failed to create Mangum handler: {e}", file=sys.stderr)
-        print(traceback.format_exc(), file=sys.stderr)
-        if logger:
-            logger.error(f"❌ Failed to create Mangum handler: {e}", exc_info=True)
-        # Handler already set to emergency_handler at top, so we're safe
-        print("⚠️ Using emergency handler", file=sys.stderr)
-        if logger:
-            logger.warning("⚠️ Using emergency handler")
-
-    # Final check - ALWAYS ensure app exists (required for uvicorn when running locally)
-    if app is None and FastAPI_available:
-        print("⚠️ App is None but FastAPI is available, creating minimal app", file=sys.stderr)
-        try:
-            app = FastAPI(title="PPT Agent (Fallback Mode)", version="1.0.0")
-            @app.get("/")
-            async def root_fallback():
-                return {"error": "Application initialization failed", "status": "error"}
-            @app.get("/health")
-            async def health_fallback():
-                return {"status": "error", "message": "Initialization failed"}
-            print("✅ Created fallback FastAPI app", file=sys.stderr)
-        except Exception as e:
-            print(f"❌ Failed to create fallback app: {e}", file=sys.stderr)
-
-    # Final check - ALWAYS ensure handler exists (should never be None, but double-check)
-    if handler is None:
-        print("❌ CRITICAL: Handler is None! Using emergency handler", file=sys.stderr)
-        if logger:
-            logger.error("❌ CRITICAL: Handler is None! Using emergency handler")
-        handler = emergency_handler
-
-    print("=" * 60, file=sys.stderr)
-    print("Application startup complete!", file=sys.stderr)
-    print(f"Handler type: {type(handler)}", file=sys.stderr)
-    print(f"App type: {type(app) if app else 'None'}", file=sys.stderr)
-    print("=" * 60, file=sys.stderr)
-
-    if logger:
-        logger.info("=" * 60)
-        logger.info("Application startup complete!")
-        logger.info(f"Handler type: {type(handler)}")
-        logger.info(f"App type: {type(app) if app else 'None'}")
-        logger.info("=" * 60)
-
-except Exception as e:
-    # CRITICAL: If ANYTHING fails at module level, we MUST still have a handler
-    # This catch-all ensures Python never exits with status 1
-    print("=" * 60, file=sys.stderr)
-    print("CRITICAL ERROR during module initialization!", file=sys.stderr)
-    print(f"Error: {e}", file=sys.stderr)
+    print(f"❌ Failed to create Mangum handler: {e}", file=sys.stderr)
     print(traceback.format_exc(), file=sys.stderr)
-    print("=" * 60, file=sys.stderr)
-    print("Using emergency handler to prevent crash", file=sys.stderr)
-    # Handler is already set to emergency_handler, so we're safe
-    # Don't re-raise - this would cause Python to exit
+    if logger:
+        logger.error(f"❌ Failed to create Mangum handler: {e}", exc_info=True)
+    # Handler already set to emergency_handler at top, so we're safe
+    print("⚠️ Using emergency handler", file=sys.stderr)
+    if logger:
+        logger.warning("⚠️ Using emergency handler")
+
+# Final check - ALWAYS ensure app exists (required for uvicorn when running locally)
+if app is None and FastAPI_available:
+    print("⚠️ App is None but FastAPI is available, creating minimal app", file=sys.stderr)
+    try:
+        app = FastAPI(title="PPT Agent (Fallback Mode)", version="1.0.0")
+        @app.get("/")
+        async def root_fallback():
+            return {"error": "Application initialization failed", "status": "error"}
+        @app.get("/health")
+        async def health_fallback():
+            return {"status": "error", "message": "Initialization failed"}
+        print("✅ Created fallback FastAPI app", file=sys.stderr)
+    except Exception as e:
+        print(f"❌ Failed to create fallback app: {e}", file=sys.stderr)
+
+# Final check - ALWAYS ensure handler exists (should never be None, but double-check)
+if handler is None:
+    print("❌ CRITICAL: Handler is None! Using emergency handler", file=sys.stderr)
+    if logger:
+        logger.error("❌ CRITICAL: Handler is None! Using emergency handler")
+    handler = emergency_handler
+
+print("=" * 60, file=sys.stderr)
+print("Application startup complete!", file=sys.stderr)
+print(f"Handler type: {type(handler)}", file=sys.stderr)
+print(f"App type: {type(app) if app else 'None'}", file=sys.stderr)
+print("=" * 60, file=sys.stderr)
+
+if logger:
+    logger.info("=" * 60)
+    logger.info("Application startup complete!")
+    logger.info(f"Handler type: {type(handler)}")
+    logger.info(f"App type: {type(app) if app else 'None'}")
+    logger.info("=" * 60)

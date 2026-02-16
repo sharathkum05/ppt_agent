@@ -116,3 +116,6 @@ pkill -9 -f "vite.*ppt-agent"
 2. Open http://localhost:5173 to use the frontend interface
 3. Try generating a presentation!
 
+
+
+

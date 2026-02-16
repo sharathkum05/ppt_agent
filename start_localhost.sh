@@ -44,3 +44,6 @@ echo ""
 echo "🛑 To stop: pkill -f 'uvicorn.*app.main:app'"
 echo "═══════════════════════════════════════════════════"
 
+
+
+
