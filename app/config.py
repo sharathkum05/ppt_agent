@@ -18,17 +18,11 @@ class Settings:
         "credentials/service_account.json"
     )
     
-    # Google Drive folder ID where presentations will be created
-    GOOGLE_DRIVE_FOLDER_ID: str = os.getenv(
-        "GOOGLE_DRIVE_FOLDER_ID",
-        "1OUSgOEPTy9Bt3nd15ZHH5DgvCho2QUwS"  # Default folder from user setup
-    )
+    # Google Drive folder ID where presentations will be created (set via env)
+    GOOGLE_DRIVE_FOLDER_ID: str = os.getenv("GOOGLE_DRIVE_FOLDER_ID", "")
     
-    # Default presentation ID to use (hardcoded template)
-    DEFAULT_PRESENTATION_ID: str = os.getenv(
-        "DEFAULT_PRESENTATION_ID",
-        "1ssIEyRV9ARbPZcKoUcl1sneIlUsW_p-ipRl7KnRRCDk"  # User's Untitled.ppt template
-    )
+    # Default presentation ID to use as template (set via env)
+    DEFAULT_PRESENTATION_ID: str = os.getenv("DEFAULT_PRESENTATION_ID", "")
     
     # Google API scopes
     GOOGLE_SCOPES = [
