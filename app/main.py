@@ -1,4 +1,5 @@
 """FastAPI application for AI-powered Google Slides generation - Fixed version"""
+import os
 import sys
 import logging
 import traceback
@@ -93,9 +94,34 @@ else:
     if logger:
         logger.warning("⚠️ FastAPI not available, will use minimal handler")
 
-# Step 3: Add basic routes (no dependencies on other modules)
+# Step 3: Add CORS and basic routes (no dependencies on other modules)
 # Only add routes if app was created successfully
 if app:
+    # Allow frontend (localhost + Vercel) to call the API
+    try:
+        from fastapi.middleware.cors import CORSMiddleware
+        _origins = [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ]
+        _frontend_url = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+        if _frontend_url and _frontend_url not in _origins:
+            _origins.append(_frontend_url)
+        # Allow any Vercel deployment (production + preview URLs)
+        _origin_regex = r"^https://[a-zA-Z0-9-_.]+\.vercel\.app$"
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=_origins,
+            allow_origin_regex=_origin_regex,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+        if logger:
+            logger.info("✅ CORS middleware added")
+    except Exception as e:
+        if logger:
+            logger.warning(f"⚠️ CORS middleware failed: {e}")
     try:
         @app.get("/")
         async def root():
@@ -273,3 +299,12 @@ if logger:
     logger.info(f"Handler type: {type(handler)}")
     logger.info(f"App type: {type(app) if app else 'None'}")
     logger.info("=" * 60)
+
+# Vercel's runtime checks for `handler` first and does issubclass(handler, BaseHTTPRequestHandler).
+# Our handler is a Mangum instance (not a class), so that crashes. Remove `handler` so the
+# runtime falls through to the `app` branch and uses our FastAPI ASGI app.
+if app is not None:
+    try:
+        del handler
+    except NameError:
+        pass

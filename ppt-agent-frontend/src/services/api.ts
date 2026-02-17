@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // @ts-ignore - Vite env types
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8001').replace(/\/$/, '');
 
 export interface GeneratePresentationRequest {
   prompt: string;
