@@ -47,6 +47,9 @@ ppt-agent-frontend/dist/
 ppt-agent-frontend/.vite/
 ppt-agent-frontend/.env.local
 ppt-agent-frontend/.env.production.local
+# Allow frontend src/lib (cn/utils) - root lib/ would otherwise ignore it
+!ppt-agent-frontend/src/lib/
+!ppt-agent-frontend/src/lib/**
 
 # Logs
 *.log

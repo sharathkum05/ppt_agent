@@ -200,16 +200,15 @@ ppt_agent/
 
 ### Deploy to Vercel
 
-**Backend:**
+**Backend** (from repo root; this is what’s deployed if you only ran `vercel` once):
 ```bash
 vercel --prod
 ```
+→ Visiting the project URL shows the API (e.g. `{"status":"ok",...}`).
 
-**Frontend:**
-```bash
-cd ppt-agent-frontend
-vercel --prod
-```
+**Frontend** (landing page with prompt + “Generate Presentation”):
+- Deploy from the **ppt-agent-frontend** folder as a **separate Vercel project** (same repo, Root Directory = `ppt-agent-frontend`), and set `VITE_API_URL` to your backend URL.
+- Step-by-step: see **[DEPLOY_FRONTEND.md](./DEPLOY_FRONTEND.md)**.
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
 

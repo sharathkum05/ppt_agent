@@ -1,5 +1,7 @@
 # Vercel deployment – fix “link not working”
 
+**Only backend deployed?** Your URL shows API JSON. To get the **landing page**, deploy the frontend too → see **[DEPLOY_FRONTEND.md](./DEPLOY_FRONTEND.md)**.
+
 Follow these steps so the **frontend** can talk to the **backend** on Vercel.
 
 ## 1. Deploy the backend (repo root)
